@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Real-time chat system: Direct chat, pod group chat, event chat, conversation list with unread indicators, message sending/receiving with Supabase Realtime setup (falling back to polling in mock mode), block/report UI.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create src/lib/chat/context.tsx - ChatProvider managing conversations state, active conversation, messages, sending state. In mock mode, uses local state with simulated message delivery. When Supabase is connected, subscribes to Realtime channels.",
     "Create src/lib/chat/realtime.ts - Supabase Realtime subscription helpers: subscribeToConversation, unsubscribeFromConversation, sendMessage. Gracefully handles disconnections by falling back to manual refetch. If Supabase not configured, uses mock in-memory message store.",
