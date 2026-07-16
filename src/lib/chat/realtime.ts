@@ -3,75 +3,15 @@
 import type { Message, Conversation, ConversationMember } from '@/types/database';
 import { isSupabaseConfigured, createClient } from '@/lib/supabase/client';
 import {
-  mockConversations,
-  mockConversationMembers,
-  mockMessages,
-} from '@/lib/mock-data/conversations';
+  getStoredConversations,
+  setStoredConversations,
+  getStoredMembers,
+  setStoredMembers,
+  getStoredMessages,
+  setStoredMessages,
+  STORAGE_KEYS,
+} from '@/lib/data/storage';
 import { mockStudents } from '@/lib/mock-data/students';
-
-// ============================================================
-// localStorage keys
-// ============================================================
-const CONVERSATIONS_KEY = 'spartancircle_conversations';
-const MEMBERS_KEY = 'spartancircle_conversation_members';
-const MESSAGES_KEY = 'spartancircle_messages';
-const BLOCKS_KEY = 'spartancircle_blocks';
-
-// ============================================================
-// Local Storage Helpers
-// ============================================================
-
-function getStoredConversations(): Conversation[] {
-  if (typeof window === 'undefined') return mockConversations;
-  try {
-    const stored = localStorage.getItem(CONVERSATIONS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {
-    // fall through
-  }
-  // Initialize with mock data
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(mockConversations));
-  return mockConversations;
-}
-
-function setStoredConversations(convos: Conversation[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(convos));
-}
-
-function getStoredMembers(): ConversationMember[] {
-  if (typeof window === 'undefined') return mockConversationMembers;
-  try {
-    const stored = localStorage.getItem(MEMBERS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {
-    // fall through
-  }
-  localStorage.setItem(MEMBERS_KEY, JSON.stringify(mockConversationMembers));
-  return mockConversationMembers;
-}
-
-function setStoredMembers(members: ConversationMember[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
-}
-
-function getStoredMessages(): Message[] {
-  if (typeof window === 'undefined') return mockMessages;
-  try {
-    const stored = localStorage.getItem(MESSAGES_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {
-    // fall through
-  }
-  localStorage.setItem(MESSAGES_KEY, JSON.stringify(mockMessages));
-  return mockMessages;
-}
-
-function setStoredMessages(messages: Message[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
-}
 
 // ============================================================
 // Block helpers
@@ -86,7 +26,7 @@ export interface BlockEntry {
 export function getBlocks(): BlockEntry[] {
   if (typeof window === 'undefined') return [];
   try {
-    const stored = localStorage.getItem(BLOCKS_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.BLOCKS);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -100,7 +40,7 @@ export function addBlock(blockerId: string, blockedUserId: string): void {
     blocked_user_id: blockedUserId,
     created_at: new Date().toISOString(),
   });
-  localStorage.setItem(BLOCKS_KEY, JSON.stringify(blocks));
+  localStorage.setItem(STORAGE_KEYS.BLOCKS, JSON.stringify(blocks));
 }
 
 export function isBlocked(userId: string, otherUserId: string): boolean {

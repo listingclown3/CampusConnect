@@ -80,19 +80,22 @@ export default function MatchDetailPage() {
     setSaved(isMatchSaved(matchedStudent.user_id));
 
     const sharedClassNames = sharedClasses.map((c) => c.course_code);
+    const currentUser = user;
+    const currentMatch = matchedStudent;
+    const currentResult = matchResult;
 
     async function generate() {
       setIsGenerating(true);
       try {
         const [exp, starter] = await Promise.all([
-          generateMatchExplanation(user!, matchedStudent!, matchResult!.breakdown, sharedClassNames),
-          generateConversationStarter(user!, matchedStudent!, sharedClassNames),
+          generateMatchExplanation(currentUser, currentMatch, currentResult.breakdown, sharedClassNames),
+          generateConversationStarter(currentUser, currentMatch, sharedClassNames),
         ]);
         setExplanation(exp);
         setStarterMessage(starter);
       } catch {
-        setExplanation(`${matchedStudent!.first_name} could be a great connection based on your profiles.`);
-        setStarterMessage(`Hey ${matchedStudent!.first_name}! I'd love to connect and learn more about your experience at SJSU.`);
+        setExplanation(`${currentMatch.first_name} could be a great connection based on your profiles.`);
+        setStarterMessage(`Hey ${currentMatch.first_name}! I'd love to connect and learn more about your experience at SJSU.`);
       }
       setIsGenerating(false);
     }
@@ -287,10 +290,12 @@ export default function MatchDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <SharedAvailability
-            availabilityA={user!.availability}
-            availabilityB={matchedStudent.availability}
-          />
+          {user && (
+            <SharedAvailability
+              availabilityA={user.availability}
+              availabilityB={matchedStudent.availability}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -330,7 +335,7 @@ export default function MatchDetailPage() {
                 Your goals
               </p>
               <div className="space-y-1">
-                {user!.career_goals.map((goal) => (
+                {user?.career_goals.map((goal) => (
                   <p key={goal} className="text-sm capitalize">{goal}</p>
                 ))}
               </div>
@@ -351,11 +356,12 @@ export default function MatchDetailPage() {
 
       {/* Complementary skills */}
       {(() => {
-        const myUniqueSkills = user!.skills.filter(
+        if (!user) return null;
+        const myUniqueSkills = user.skills.filter(
           (s) => !matchedStudent.skills.some((ms) => ms.toLowerCase() === s.toLowerCase())
         );
         const theirUniqueSkills = matchedStudent.skills.filter(
-          (s) => !user!.skills.some((ms) => ms.toLowerCase() === s.toLowerCase())
+          (s) => !user.skills.some((ms) => ms.toLowerCase() === s.toLowerCase())
         );
         if (myUniqueSkills.length === 0 && theirUniqueSkills.length === 0) return null;
         return (

@@ -1,5 +1,19 @@
 import type { Profile, Event, MatchBreakdown } from '@/types/database';
 
+/**
+ * NOTE: The OpenAI code path is intentionally unreachable in the current architecture.
+ *
+ * `isOpenAIConfigured()` reads `process.env.OPENAI_API_KEY`, which is a server-only
+ * environment variable. Since all AI generation functions are called from client
+ * components (match detail page, pod detail, event detail), `process.env.OPENAI_API_KEY`
+ * will always be `undefined` in the browser bundle (Next.js only exposes env vars
+ * prefixed with `NEXT_PUBLIC_` to the client).
+ *
+ * This is by design for the MVP: the template-based fallbacks produce deterministic,
+ * data-driven text that is sufficient for the demo. To enable real OpenAI generation,
+ * these functions would need to be called via an API route (e.g., /api/ai/generate)
+ * that runs server-side where the env var is accessible.
+ */
 function isOpenAIConfigured(): boolean {
   return !!process.env.OPENAI_API_KEY;
 }

@@ -133,13 +133,17 @@ export default function PodDetailPage() {
   useEffect(() => {
     if (!pod || !podData || !user) return;
 
+    const currentMembers = podData.memberProfiles;
+    const currentPodType = pod.pod_type;
+    const currentSharedClassNames = podData.sharedClassNames;
+
     async function generate() {
       setIsGenerating(true);
       try {
         const exp = await generatePodExplanation(
-          podData!.memberProfiles,
-          pod!.pod_type,
-          podData!.sharedClassNames
+          currentMembers,
+          currentPodType,
+          currentSharedClassNames
         );
         setExplanation(exp);
       } catch {

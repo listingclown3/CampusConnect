@@ -1,14 +1,14 @@
 'use client';
 
-import type { PodMember, Conversation, ConversationMember } from '@/types/database';
+import type { PodMember, Conversation } from '@/types/database';
 import { mockPodMembers } from '@/lib/mock-data/pods';
-
-// ============================================================
-// localStorage keys
-// ============================================================
-const POD_MEMBERS_KEY = 'spartancircle_pod_members';
-const CONVERSATIONS_KEY = 'spartancircle_conversations';
-const CONV_MEMBERS_KEY = 'spartancircle_conversation_members';
+import {
+  getStoredConversations,
+  setStoredConversations,
+  getStoredMembers as getStoredConvMembers,
+  setStoredMembers as setStoredConvMembers,
+  STORAGE_KEYS,
+} from '@/lib/data/storage';
 
 // ============================================================
 // Pod Members Storage
@@ -17,52 +17,18 @@ const CONV_MEMBERS_KEY = 'spartancircle_conversation_members';
 export function getStoredPodMembers(): PodMember[] {
   if (typeof window === 'undefined') return mockPodMembers;
   try {
-    const stored = localStorage.getItem(POD_MEMBERS_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.POD_MEMBERS);
     if (stored) return JSON.parse(stored);
   } catch {
     // fall through
   }
-  localStorage.setItem(POD_MEMBERS_KEY, JSON.stringify(mockPodMembers));
+  localStorage.setItem(STORAGE_KEYS.POD_MEMBERS, JSON.stringify(mockPodMembers));
   return [...mockPodMembers];
 }
 
 function setStoredPodMembers(members: PodMember[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(POD_MEMBERS_KEY, JSON.stringify(members));
-}
-
-// ============================================================
-// Conversation Storage (shared with chat system)
-// ============================================================
-
-function getStoredConversations(): Conversation[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(CONVERSATIONS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function setStoredConversations(convos: Conversation[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(convos));
-}
-
-function getStoredConvMembers(): ConversationMember[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(CONV_MEMBERS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function setStoredConvMembers(members: ConversationMember[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CONV_MEMBERS_KEY, JSON.stringify(members));
+  localStorage.setItem(STORAGE_KEYS.POD_MEMBERS, JSON.stringify(members));
 }
 
 // ============================================================

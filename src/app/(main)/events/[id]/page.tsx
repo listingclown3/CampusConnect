@@ -223,19 +223,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (!user || !event) return;
 
+    const currentUser = user;
+    const currentEvent = event;
+
     async function generate() {
       setIsGenerating(true);
       try {
-        const userInterests = user!.interests.map((i) => i.toLowerCase());
-        const eventTags = event!.tags.map((t) => t.toLowerCase());
+        const userInterests = currentUser.interests.map((i) => i.toLowerCase());
+        const eventTags = currentEvent.tags.map((t) => t.toLowerCase());
         const matchedTags = eventTags.filter((tag) =>
           userInterests.some(
             (interest) => interest.includes(tag) || tag.includes(interest)
           )
         );
         const reason = await generateEventRecommendationReason(
-          user!,
-          event!,
+          currentUser,
+          currentEvent,
           matchedTags
         );
         setExplanation(reason);

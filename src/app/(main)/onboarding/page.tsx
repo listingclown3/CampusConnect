@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { AvailabilityGrid, DEFAULT_AVAILABILITY } from '@/components/onboarding/
 import { InterestTags } from '@/components/onboarding/interest-tags';
 import { useAuth } from '@/lib/auth/context';
 import { mockClasses } from '@/lib/mock-data/classes';
+import { STORAGE_KEYS } from '@/lib/data/storage';
 import { Calendar } from 'lucide-react';
 import type { Profile, StudentType, StudyStyle, CollaborationStyle, ConnectionType, Availability } from '@/types/database';
 import { toast } from 'sonner';
@@ -125,26 +126,62 @@ interface FormData {
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, updateProfile } = useAuth();
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
-    first_name: user?.first_name || '',
-    last_name: user?.last_name || '',
-    student_type: user?.student_type || 'freshman',
-    graduation_year: user?.graduation_year || 2028,
-    major: user?.major || '',
-    intended_major: user?.intended_major || '',
-    classes: [],
-    interests: user?.interests || [],
-    career_goals: user?.career_goals?.join(', ') || '',
-    study_style: user?.study_style || 'flexible',
-    collaboration_style: user?.collaboration_style || 'adaptive',
-    skills: user?.skills || [],
-    connection_types: user?.connection_types || [],
-    availability: user?.availability || DEFAULT_AVAILABILITY,
-    is_visible: true,
-    show_email: false,
-    availability_detail: 'full',
+
+  // Restore saved progress from localStorage
+  const getSavedProgress = (): { step: number; formData: FormData } | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.ONBOARDING_PROGRESS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore parse errors
+    }
+    return null;
+  };
+
+  const savedProgress = getSavedProgress();
+
+  const [step, setStep] = useState(savedProgress?.step || 1);
+  const [formData, setFormData] = useState<FormData>(() => {
+    if (savedProgress?.formData) {
+      return savedProgress.formData;
+    }
+    return {
+      first_name: user?.first_name || '',
+      last_name: user?.last_name || '',
+      student_type: user?.student_type || 'freshman',
+      graduation_year: user?.graduation_year || 2028,
+      major: user?.major || '',
+      intended_major: user?.intended_major || '',
+      classes: [],
+      interests: user?.interests || [],
+      career_goals: user?.career_goals?.join(', ') || '',
+      study_style: user?.study_style || 'flexible',
+      collaboration_style: user?.collaboration_style || 'adaptive',
+      skills: user?.skills || [],
+      connection_types: user?.connection_types || [],
+      availability: user?.availability || DEFAULT_AVAILABILITY,
+      is_visible: true,
+      show_email: false,
+      availability_detail: 'full',
+    };
   });
+
+  // Persist progress to localStorage whenever step or formData changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const progress = JSON.stringify({ step, formData });
+      localStorage.setItem(STORAGE_KEYS.ONBOARDING_PROGRESS, progress);
+    } catch {
+      // Storage full or unavailable - non-critical
+    }
+  }, [step, formData]);
+
+  const clearSavedProgress = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(STORAGE_KEYS.ONBOARDING_PROGRESS);
+  }, []);
 
   const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -183,6 +220,7 @@ export default function OnboardingPage() {
     };
 
     updateProfile(updatedProfile);
+    clearSavedProgress();
     toast.success('Profile complete! Welcome to SpartanCircle.');
     router.push('/dashboard');
   };

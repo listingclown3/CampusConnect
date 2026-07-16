@@ -1,14 +1,13 @@
 'use client';
 
-import type { EventRsvp, RsvpStatus, Conversation, ConversationMember } from '@/types/database';
-
-// ============================================================
-// localStorage keys
-// ============================================================
-const RSVPS_KEY = 'spartancircle_event_rsvps';
-const CONVERSATIONS_KEY = 'spartancircle_conversations';
-const CONV_MEMBERS_KEY = 'spartancircle_conversation_members';
-const CLUB_MEMBERS_KEY = 'spartancircle_club_members';
+import type { EventRsvp, RsvpStatus, Conversation } from '@/types/database';
+import {
+  getStoredConversations,
+  setStoredConversations,
+  getStoredMembers as getStoredConvMembers,
+  setStoredMembers as setStoredConvMembers,
+  STORAGE_KEYS,
+} from '@/lib/data/storage';
 
 // ============================================================
 // RSVP Storage
@@ -17,7 +16,7 @@ const CLUB_MEMBERS_KEY = 'spartancircle_club_members';
 function getStoredRsvps(): EventRsvp[] {
   if (typeof window === 'undefined') return [];
   try {
-    const stored = localStorage.getItem(RSVPS_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.EVENT_RSVPS);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -26,7 +25,7 @@ function getStoredRsvps(): EventRsvp[] {
 
 function setStoredRsvps(rsvps: EventRsvp[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(RSVPS_KEY, JSON.stringify(rsvps));
+  localStorage.setItem(STORAGE_KEYS.EVENT_RSVPS, JSON.stringify(rsvps));
 }
 
 // ============================================================
@@ -107,37 +106,8 @@ export function getAttendingMap(): Record<string, string[]> {
 
 // ============================================================
 // Event Conversation Integration
+// (Uses shared storage accessors from @/lib/data/storage)
 // ============================================================
-
-function getStoredConversations(): Conversation[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(CONVERSATIONS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function setStoredConversations(convos: Conversation[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(convos));
-}
-
-function getStoredConvMembers(): ConversationMember[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(CONV_MEMBERS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function setStoredConvMembers(members: ConversationMember[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CONV_MEMBERS_KEY, JSON.stringify(members));
-}
 
 export function findEventConversation(eventId: string): Conversation | null {
   const conversations = getStoredConversations();
@@ -215,7 +185,7 @@ interface ClubMembership {
 function getStoredClubMembers(): ClubMembership[] {
   if (typeof window === 'undefined') return [];
   try {
-    const stored = localStorage.getItem(CLUB_MEMBERS_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.CLUB_MEMBERS);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -224,7 +194,7 @@ function getStoredClubMembers(): ClubMembership[] {
 
 function setStoredClubMembers(members: ClubMembership[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(CLUB_MEMBERS_KEY, JSON.stringify(members));
+  localStorage.setItem(STORAGE_KEYS.CLUB_MEMBERS, JSON.stringify(members));
 }
 
 export function isUserInClub(clubId: string, userId: string): boolean {
