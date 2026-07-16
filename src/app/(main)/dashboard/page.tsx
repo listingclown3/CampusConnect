@@ -1,12 +1,98 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useAuth } from '@/lib/auth/context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UsersRound, MessageCircle, Calendar } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
+import {
+  getStudents,
+  getStudentClassIds,
+  getUserPods,
+  getUserConversations,
+  getEvents,
+  getPodMembers,
+  getPods,
+} from '@/lib/mock-data';
+import { calculateMatchScore } from '@/lib/matching/score';
+import { MatchPreviewCard } from '@/components/dashboard/match-preview-card';
+import { PodPreviewCard } from '@/components/dashboard/pod-preview-card';
+import { EventPreviewCard } from '@/components/dashboard/event-preview-card';
+import { StatsBar } from '@/components/dashboard/stats-bar';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  const topMatches = useMemo(() => {
+    if (!user) return [];
+    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible);
+    const currentUserClasses = getStudentClassIds(user.user_id);
+
+    const scored = students.map((student) => {
+      const studentClasses = getStudentClassIds(student.user_id);
+      const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
+      return { student, score: result.score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 3);
+  }, [user]);
+
+  const recommendedPod = useMemo(() => {
+    if (!user) return null;
+    const userPods = getUserPods(user.user_id);
+    const allPods = getPods();
+    // Recommend the highest-scored pod the user is NOT already in
+    const userPodIds = new Set(userPods.map((p) => p.id));
+    const available = allPods
+      .filter((p) => !userPodIds.has(p.id) && p.is_active)
+      .sort((a, b) => b.score - a.score);
+    if (available.length === 0 && allPods.length > 0) {
+      return { pod: allPods[0], memberCount: getPodMembers(allPods[0].id).length };
+    }
+    if (available.length === 0) return null;
+    return { pod: available[0], memberCount: getPodMembers(available[0].id).length };
+  }, [user]);
+
+  const upcomingEvent = useMemo(() => {
+    const events = getEvents();
+    // Sort by start_time and return the earliest upcoming one
+    const sorted = [...events].sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+    return sorted[0] || null;
+  }, []);
+
+  const stats = useMemo(() => {
+    if (!user) return { totalMatches: 0, podsJoined: 0, unreadMessages: 0 };
+    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible);
+    const currentUserClasses = getStudentClassIds(user.user_id);
+    const matchCount = students.filter((student) => {
+      const studentClasses = getStudentClassIds(student.user_id);
+      const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
+      return result.score > 0;
+    }).length;
+    const podsJoined = getUserPods(user.user_id).length;
+    const conversations = getUserConversations(user.user_id);
+    // Simulate unread messages count
+    const unreadMessages = Math.min(conversations.length, 3);
+    return { totalMatches: matchCount, podsJoined, unreadMessages };
+  }, [user]);
+
+  if (isLoading) {
+    return (
+      <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-48" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-6">
@@ -20,79 +106,78 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Link href="/matches">
-          <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Matches</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/pods">
-          <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <UsersRound className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Pods</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/chat">
-          <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <MessageCircle className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Chat</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/campus">
-          <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
-            <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Campus</span>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+      {/* Quick Stats */}
+      <StatsBar
+        totalMatches={stats.totalMatches}
+        podsJoined={stats.podsJoined}
+        unreadMessages={stats.unreadMessages}
+      />
 
-      {/* Profile Summary */}
+      {/* Top Matches */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Your Profile</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Top Matches</CardTitle>
+          <Link
+            href="/matches"
+            className="flex items-center gap-1 text-sm text-primary hover:underline"
+          >
+            View all
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground w-24">Major</span>
-            <span className="font-medium">{user?.major || 'Not set'}</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground w-24">Study Style</span>
-            <span className="font-medium capitalize">{user?.study_style || 'Not set'}</span>
-          </div>
-          <div className="flex items-start gap-4 text-sm">
-            <span className="text-muted-foreground w-24">Interests</span>
-            <div className="flex flex-wrap gap-1.5">
-              {user?.interests?.slice(0, 5).map((interest) => (
-                <span
-                  key={interest}
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary font-medium"
-                >
-                  {interest}
-                </span>
-              ))}
-            </div>
-          </div>
+        <CardContent className="space-y-2">
+          {topMatches.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Complete your profile to see matches!
+            </p>
+          ) : (
+            topMatches.map(({ student, score }) => (
+              <MatchPreviewCard
+                key={student.user_id}
+                userId={student.user_id}
+                name={`${student.first_name} ${student.last_name}`}
+                major={student.major}
+                compatibility={score}
+              />
+            ))
+          )}
         </CardContent>
       </Card>
+
+      {/* Bottom row: Pod + Event */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Recommended Pod */}
+        {recommendedPod && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Recommended Pod
+            </h2>
+            <PodPreviewCard
+              podId={recommendedPod.pod.id}
+              name={recommendedPod.pod.name}
+              podType={recommendedPod.pod.pod_type}
+              memberCount={recommendedPod.memberCount}
+              score={recommendedPod.pod.score}
+            />
+          </div>
+        )}
+
+        {/* Upcoming Event */}
+        {upcomingEvent && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Upcoming Event
+            </h2>
+            <EventPreviewCard
+              eventId={upcomingEvent.id}
+              title={upcomingEvent.title}
+              startTime={upcomingEvent.start_time}
+              location={upcomingEvent.location}
+              rsvpCount={upcomingEvent.rsvp_count}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Dashboard, individual matching, and match detail pages: Dashboard with overview cards, match list with compatibility scores and reasons, match detail with full breakdown and conversation starter, match actions (save/skip/chat).",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create src/app/(main)/dashboard/page.tsx - Dashboard page showing: welcome message with user name, top 3 match previews (avatar, name, compatibility %), recommended pod preview card, upcoming event card, quick stats (total matches, pods joined, unread messages). Use shadcn Card components with clean grid layout.",
     "Create src/components/dashboard/match-preview-card.tsx - Compact match card showing avatar, name, major, compatibility percentage with color-coded badge (green >80%, yellow >60%, orange otherwise).",
