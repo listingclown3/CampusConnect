@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Authentication, onboarding, and app shell: Landing page, demo login, signup, full onboarding flow, app layout with mobile bottom navigation, and settings pages.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create src/app/layout.tsx as root layout with Inter font, metadata (title: SpartanCircle), theme-color meta tag (#0055A2), viewport meta for mobile, and global CSS import.",
     "Create src/app/globals.css with Tailwind directives and CSS variables for the SJSU color theme (matching shadcn/ui theme format).",
