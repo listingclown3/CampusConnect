@@ -2,7 +2,7 @@
   "id": "FEAT-006",
   "type": "feat",
   "description": "Events, clubs, and campus pages: Event listing with recommendations, event detail with RSVP, event chat, club listing, club detail, and recommendation scoring with explanations.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create src/app/(main)/events/page.tsx - Events page with two sections: 'Recommended For You' (scored and explained) and 'All Events' (chronological). Each event card shows: name, date/time, location, club/org host, attendee count, 'Why recommended' snippet, RSVP button. Filter by upcoming/past. Empty state.",
     "Create src/components/events/event-card.tsx - Event card with name, date, location, host badge, attendee count, recommendation reason badge, RSVP status indicator, and RSVP action button.",
