@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Real-time chat system: Direct chat, pod group chat, event chat, conversation list with unread indicators, message sending/receiving with Supabase Realtime setup (falling back to polling in mock mode), block/report UI.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create src/lib/chat/context.tsx - ChatProvider managing conversations state, active conversation, messages, sending state. In mock mode, uses local state with simulated message delivery. When Supabase is connected, subscribes to Realtime channels.",
     "Create src/lib/chat/realtime.ts - Supabase Realtime subscription helpers: subscribeToConversation, unsubscribeFromConversation, sendMessage. Gracefully handles disconnections by falling back to manual refetch. If Supabase not configured, uses mock in-memory message store.",
@@ -37,5 +37,5 @@
     "pnpm test"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Chat system implemented with full localStorage persistence for mock mode. Supabase Realtime subscription code is in place but inactive without env vars. The dialog component uses @base-ui/react primitives (not radix), so block/report dialog was built with native div overlays for simplicity and reliability. The ChatProvider is installed at root layout level (wrapping all routes). All 52 tests pass. Build produces /chat as static and /chat/[conversationId] as dynamic route."
 }
