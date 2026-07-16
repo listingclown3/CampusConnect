@@ -1,0 +1,50 @@
+{
+  "id": "FEAT-007",
+  "type": "feat",
+  "description": "PWA support, mobile polish, safety features, loading/empty/error states, offline fallback, and final demo flow verification. Make the app installable, polished on mobile, and handle all edge cases.",
+  "status": "pending",
+  "steps": [
+    "Create public/manifest.json - PWA manifest with name: SpartanCircle, short_name: SpartanCircle, start_url: /dashboard, display: standalone, theme_color: #0055A2, background_color: #ffffff, icons array with placeholder icons at 192x192 and 512x512.",
+    "Create public/icons/icon-192x192.png and public/icons/icon-512x512.png - Simple placeholder icons (can be generated SVG-based or solid color with SC text).",
+    "Create public/sw.js or src/app/service-worker.ts - Basic service worker that caches the offline fallback page and serves it when network is unavailable.",
+    "Create src/app/offline/page.tsx - Offline fallback page with friendly message: 'You appear to be offline. SpartanCircle needs an internet connection to sync your matches and messages. Your data will be here when you reconnect.' Include SJSU blue styling.",
+    "Add PWA meta tags to src/app/layout.tsx: link rel=manifest, meta name=theme-color, meta name=apple-mobile-web-app-capable, apple-touch-icon link.",
+    "Register service worker in src/app/layout.tsx or a client component that runs on mount.",
+    "Create src/components/ui/loading-skeleton.tsx - Reusable skeleton loader component for cards, lists, and pages.",
+    "Create src/components/ui/empty-state.tsx - Reusable empty state component with icon, title, description, and optional CTA button. Use for: no matches, no pods, no events, no conversations, no availability set.",
+    "Create src/components/ui/error-state.tsx - Reusable error state component for: access denied, not found, network error, AI failure.",
+    "Add loading.tsx files in key route groups: src/app/(main)/dashboard/loading.tsx, src/app/(main)/matches/loading.tsx, src/app/(main)/pods/loading.tsx, src/app/(main)/chat/loading.tsx, src/app/(main)/events/loading.tsx - each with appropriate skeleton layouts.",
+    "Add error.tsx files in key route groups with the error-state component.",
+    "Add not-found.tsx at app level and in dynamic routes ([id] pages).",
+    "Ensure all interactive elements have minimum 44x44px touch targets on mobile.",
+    "Review all pages for mobile responsiveness: proper padding (px-4 on mobile), readable font sizes (min 14px body), no horizontal overflow, proper spacing between elements.",
+    "Ensure mobile bottom nav is fixed at bottom, does not overlap content (add pb-16 to main content area), and has proper safe-area-inset padding for notched phones.",
+    "Implement block user flow: from match card/detail or chat, user can block. Blocked users are filtered from matches, pods, chats, and events context throughout the app.",
+    "Implement report flow: report dialog with reason (spam, harassment, inappropriate, other) and optional description. Stores in reports collection.",
+    "Implement leave conversation: from chat header menu, confirm dialog, then remove user from conversation members.",
+    "Implement hide profile toggle: from settings/privacy, hides user from all matching results for others.",
+    "Add proper focus states, aria-labels, and keyboard navigation for accessibility basics.",
+    "Final pass: ensure the complete demo flow works end-to-end: landing -> demo login -> dashboard -> top match -> match detail -> conversation starter -> send message -> pods -> join pod -> pod chat -> events -> RSVP -> mobile navigation between all sections."
+  ],
+  "acceptance_criteria": [
+    "manifest.json is valid and app is installable (Add to Home Screen prompt possible)",
+    "Offline fallback page renders when network is unavailable",
+    "All pages have loading skeleton states",
+    "Empty states render with friendly messages and CTAs",
+    "Error states handle 404, access denied, and network errors",
+    "Mobile bottom nav is fixed and does not overlap content",
+    "All touch targets are minimum 44x44px",
+    "Block user removes them from all visible contexts",
+    "Report dialog submits with reason",
+    "Leave conversation removes user and navigates back",
+    "Hide profile toggle prevents user from appearing in others' matches",
+    "Complete demo flow works without errors from landing to RSVP",
+    "pnpm build succeeds without errors"
+  ],
+  "verification": [
+    "pnpm build",
+    "pnpm test"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
