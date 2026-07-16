@@ -47,7 +47,8 @@ export function ChatHeader({
           variant="ghost"
           size="icon-sm"
           onClick={() => router.push('/chat')}
-          className="shrink-0"
+          className="shrink-0 min-w-[44px] min-h-[44px]"
+          aria-label="Back to messages"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -67,9 +68,10 @@ export function ChatHeader({
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
-              'inline-flex items-center justify-center rounded-lg p-2',
+              'inline-flex items-center justify-center rounded-lg p-2 min-w-[44px] min-h-[44px]',
               'hover:bg-muted transition-colors'
             )}
+            aria-label="Chat options"
           >
             <MoreVertical className="h-5 w-5 text-muted-foreground" />
           </DropdownMenuTrigger>
@@ -138,7 +140,7 @@ export function ChatHeader({
         open={showBlockReport}
         onOpenChange={setShowBlockReport}
         mode={blockReportMode}
-        onConfirm={() => {
+        onConfirm={(reason, description) => {
           if (blockReportMode === 'block' && onBlock) {
             onBlock();
           }

@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth/context';
 import { getStudents, getStudentClassIds, getClassesByIds } from '@/lib/mock-data';
 import { calculateMatchScore } from '@/lib/matching/score';
 import { getSkippedMatches, undoSkipMatch } from '@/lib/data/match-actions';
+import { getHiddenUserIds } from '@/lib/data/safety-actions';
 import { MatchCard } from '@/components/matches/match-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,9 @@ export default function MatchesPage() {
 
   const matches = useMemo(() => {
     if (!user) return [];
+    const hiddenIds = getHiddenUserIds(user.user_id);
     const students = getStudents().filter(
-      (s) => s.user_id !== user.user_id && s.is_visible
+      (s) => s.user_id !== user.user_id && s.is_visible && !hiddenIds.includes(s.user_id)
     );
     const currentUserClasses = getStudentClassIds(user.user_id);
 

@@ -2,7 +2,7 @@
   "id": "FEAT-007",
   "type": "feat",
   "description": "PWA support, mobile polish, safety features, loading/empty/error states, offline fallback, and final demo flow verification. Make the app installable, polished on mobile, and handle all edge cases.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create public/manifest.json - PWA manifest with name: SpartanCircle, short_name: SpartanCircle, start_url: /dashboard, display: standalone, theme_color: #0055A2, background_color: #ffffff, icons array with placeholder icons at 192x192 and 512x512.",
     "Create public/icons/icon-192x192.png and public/icons/icon-512x512.png - Simple placeholder icons (can be generated SVG-based or solid color with SC text).",

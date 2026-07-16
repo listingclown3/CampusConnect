@@ -61,10 +61,10 @@ export default function MainLayout({
             </div>
             <div className="hidden lg:block" />
             <div className="flex items-center gap-3">
-              <Link href="/settings" className="p-2 rounded-lg hover:bg-muted transition-colors">
+              <Link href="/settings" className="p-2 rounded-lg hover:bg-muted transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label="Settings">
                 <Settings className="w-5 h-5 text-muted-foreground" />
               </Link>
-              <Link href="/settings/profile" className="flex items-center gap-2">
+              <Link href="/settings/profile" className="flex items-center gap-2 min-w-[44px] min-h-[44px] justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label="Profile">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                     {user ? getInitials(`${user.first_name} ${user.last_name}`) : '?'}

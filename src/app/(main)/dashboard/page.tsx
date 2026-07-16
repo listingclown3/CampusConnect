@@ -16,6 +16,7 @@ import {
   getPods,
 } from '@/lib/mock-data';
 import { calculateMatchScore } from '@/lib/matching/score';
+import { getHiddenUserIds } from '@/lib/data/safety-actions';
 import { MatchPreviewCard } from '@/components/dashboard/match-preview-card';
 import { PodPreviewCard } from '@/components/dashboard/pod-preview-card';
 import { EventPreviewCard } from '@/components/dashboard/event-preview-card';
@@ -26,7 +27,8 @@ export default function DashboardPage() {
 
   const topMatches = useMemo(() => {
     if (!user) return [];
-    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible);
+    const hiddenIds = getHiddenUserIds(user.user_id);
+    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible && !hiddenIds.includes(s.user_id));
     const currentUserClasses = getStudentClassIds(user.user_id);
 
     const scored = students.map((student) => {
@@ -66,7 +68,8 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     if (!user) return { totalMatches: 0, podsJoined: 0, unreadMessages: 0 };
-    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible);
+    const hiddenIds = getHiddenUserIds(user.user_id);
+    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible && !hiddenIds.includes(s.user_id));
     const currentUserClasses = getStudentClassIds(user.user_id);
     const matchCount = students.filter((student) => {
       const studentClasses = getStudentClassIds(student.user_id);
