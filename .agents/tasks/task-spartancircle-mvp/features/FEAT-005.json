@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Pods system: Pod listing, pod detail with compatibility scores, member list, shared meeting time, pod generation using matching algorithm, join/leave actions, and pod group chat integration.",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Create src/app/(main)/pods/page.tsx - Pods listing page showing: recommended pods sorted by compatibility score, each pod card shows title, type badge (study/project/career/interest/event/major_switch), member avatars (3-5), compatibility score, primary shared class/goal, suggested meeting time, Join button. Include tabs or filter for pod types. Empty state for no pods.",
     "Create src/components/pods/pod-card.tsx - Pod card component with title, type badge (color-coded by type), member avatar stack, compatibility score badge, explanation snippet, meeting time, action button (Join/Joined/Leave).",

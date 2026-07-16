@@ -21,7 +21,7 @@ export function PodPreviewCard({
   score,
 }: PodPreviewCardProps) {
   return (
-    <Link href={`/pods`}>
+    <Link href={`/pods/${podId}`}>
       <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
         <CardContent className="p-4 space-y-2">
           <div className="flex items-start justify-between gap-2">
