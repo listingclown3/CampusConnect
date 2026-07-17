@@ -1,5 +1,6 @@
 import { mockStudents } from '@/lib/mock-data/students';
 import type { Profile } from '@/types/database';
+import { notifyStorageChange, createStorageSnapshot } from '@/lib/storage-sync';
 
 const STORAGE_KEY = 'spartancircle_auth_user';
 
@@ -14,7 +15,7 @@ export function validateSjsuEmail(email: string): boolean {
  * Mock login: accepts any @sjsu.edu email.
  * Returns the matching student profile or the first student as demo user.
  */
-export function mockLogin(email: string, _password: string): { success: boolean; user: Profile | null; error?: string } {
+export function mockLogin(email: string): { success: boolean; user: Profile | null; error?: string } {
   if (!validateSjsuEmail(email)) {
     return { success: false, user: null, error: 'Please use an @sjsu.edu email address' };
   }
@@ -29,6 +30,7 @@ export function mockLogin(email: string, _password: string): { success: boolean;
 
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    notifyStorageChange();
   }
 
   return { success: true, user };
@@ -42,15 +44,17 @@ export function mockDemoLogin(): { success: boolean; user: Profile } {
 
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    notifyStorageChange();
   }
 
   return { success: true, user };
 }
 
 /**
- * Get the currently stored user from localStorage.
+ * Get the currently stored user from localStorage. Cached between storage
+ * changes so it returns a stable reference for useSyncExternalStore.
  */
-export function getStoredUser(): Profile | null {
+export const getStoredUser = createStorageSnapshot((): Profile | null => {
   if (typeof window === 'undefined') return null;
 
   try {
@@ -64,7 +68,7 @@ export function getStoredUser(): Profile | null {
   }
 
   return null;
-}
+});
 
 /**
  * Clear stored user (logout).
@@ -72,6 +76,7 @@ export function getStoredUser(): Profile | null {
 export function mockLogout(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY);
+    notifyStorageChange();
   }
 }
 
@@ -88,5 +93,6 @@ export function isAuthenticated(): boolean {
 export function updateStoredUser(profile: Profile): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    notifyStorageChange();
   }
 }

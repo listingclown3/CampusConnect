@@ -22,7 +22,6 @@ export default function EventsPage() {
     const events = getEvents();
     const students = getStudents();
     const currentUserClasses = getStudentClassIds(user.user_id);
-    const now = new Date();
 
     // Build matched user IDs
     const matchedUserIds = students
@@ -64,13 +63,13 @@ export default function EventsPage() {
     };
   }, [user]);
 
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const filteredEvents = useMemo(() => {
     return allEvents.filter((event) => {
       const eventDate = new Date(event.start_time);
       return filter === 'upcoming' ? eventDate >= now : eventDate < now;
     });
-  }, [allEvents, filter]);
+  }, [allEvents, filter, now]);
 
   if (isLoading) {
     return (

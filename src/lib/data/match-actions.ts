@@ -1,5 +1,7 @@
 'use client';
 
+import { notifyStorageChange } from '@/lib/storage-sync';
+
 const SAVED_KEY = 'spartancircle_saved_matches';
 const SKIPPED_KEY = 'spartancircle_skipped_matches';
 
@@ -16,6 +18,7 @@ function getStorageArray(key: string): string[] {
 function setStorageArray(key: string, value: string[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(key, JSON.stringify(value));
+  notifyStorageChange();
 }
 
 export function getSavedMatches(): string[] {

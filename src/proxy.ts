@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Middleware placeholder - intentionally a no-op in the current architecture.
+ * Proxy placeholder - intentionally a no-op in the current architecture.
  *
  * Why this exists:
- * When Supabase authentication is configured, this middleware will be extended
+ * When Supabase authentication is configured, this proxy will be extended
  * to verify the session cookie on each request and redirect unauthenticated
  * users to /login server-side (before any client JS runs).
  *
@@ -22,7 +22,8 @@ import type { NextRequest } from 'next/server';
  * 2. Verify the JWT server-side
  * 3. Redirect to /login if invalid/missing (for protected routes)
  */
-export function middleware(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 

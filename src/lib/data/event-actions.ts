@@ -8,6 +8,7 @@ import {
   setStoredMembers as setStoredConvMembers,
   STORAGE_KEYS,
 } from '@/lib/data/storage';
+import { notifyStorageChange } from '@/lib/storage-sync';
 
 // ============================================================
 // RSVP Storage
@@ -26,6 +27,7 @@ function getStoredRsvps(): EventRsvp[] {
 function setStoredRsvps(rsvps: EventRsvp[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.EVENT_RSVPS, JSON.stringify(rsvps));
+  notifyStorageChange();
 }
 
 // ============================================================

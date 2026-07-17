@@ -25,7 +25,6 @@ import {
   MapPin,
   Check,
   LogOut,
-  Mail,
   Globe,
 } from 'lucide-react';
 

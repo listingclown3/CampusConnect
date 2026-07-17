@@ -21,7 +21,7 @@ export function EventPreviewCard({
   rsvpCount,
 }: EventPreviewCardProps) {
   return (
-    <Link href={`/campus`}>
+    <Link href={`/events/${eventId}`}>
       <Card className="hover:border-primary/30 transition-colors cursor-pointer h-full">
         <CardContent className="p-4 space-y-2">
           <h3 className="font-medium text-sm leading-tight">{title}</h3>

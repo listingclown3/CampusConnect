@@ -6,6 +6,8 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
 import type { Conversation, Message, ConversationMember } from '@/types/database';
@@ -23,10 +25,15 @@ import {
   getLastMessage,
   isUserMember,
   isBlocked,
-  getOtherUserInDirect,
   subscribeToConversation,
   unsubscribeFromConversation,
 } from './realtime';
+import { subscribeToStorage, notifyStorageChange, createStorageSnapshot } from '@/lib/storage-sync';
+
+const EMPTY_CONVERSATIONS: Conversation[] = [];
+function getServerConversationsSnapshot(): Conversation[] {
+  return EMPTY_CONVERSATIONS;
+}
 
 // ============================================================
 // Types
@@ -59,26 +66,30 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversationState] = useState<Conversation | null>(null);
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [activeMembers, setActiveMembers] = useState<ConversationMember[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   const userId = user?.user_id || '';
+  const isLoading = !userId;
 
-  // Load conversations
+  // Load conversations from the mock store, kept in sync as it changes
+  const getConversationsSnapshot = useMemo(
+    () => createStorageSnapshot(() => (userId ? getUserConversations(userId) : EMPTY_CONVERSATIONS)),
+    [userId]
+  );
+  const conversations = useSyncExternalStore(
+    subscribeToStorage,
+    getConversationsSnapshot,
+    getServerConversationsSnapshot
+  );
+
+  // Kept for callers that mutate conversations through paths not already
+  // wired to notifyStorageChange() (e.g. via storage.ts's setters).
   const refreshConversations = useCallback(() => {
-    if (!userId) return;
-    const convos = getUserConversations(userId);
-    setConversations(convos);
-    setIsLoading(false);
-  }, [userId]);
-
-  useEffect(() => {
-    refreshConversations();
-  }, [refreshConversations]);
+    notifyStorageChange();
+  }, []);
 
   // Set active conversation
   const setActiveConversation = useCallback(

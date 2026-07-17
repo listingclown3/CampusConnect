@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useSyncExternalStore, type ReactNode } from 'react';
 import type { Profile } from '@/types/database';
 import {
   mockLogin,
@@ -9,6 +9,15 @@ import {
   getStoredUser,
   updateStoredUser,
 } from './mock-auth';
+import { subscribeToStorage } from '@/lib/storage-sync';
+
+// Sentinel distinguishing "haven't checked storage yet" (server/first paint)
+// from "checked, no user found" (null).
+const UNDETERMINED = Symbol('undetermined');
+
+function getServerSnapshot(): Profile | null | typeof UNDETERMINED {
+  return UNDETERMINED;
+}
 
 interface AuthContextType {
   user: Profile | null;
@@ -23,38 +32,31 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const snapshot = useSyncExternalStore(subscribeToStorage, getStoredUser, getServerSnapshot);
+  const isLoading = snapshot === UNDETERMINED;
+  const user = isLoading ? null : snapshot;
 
-  useEffect(() => {
-    // Restore user from localStorage on mount
-    const storedUser = getStoredUser();
-    setUser(storedUser);
-    setIsLoading(false);
-  }, []);
-
+  // password is kept in the public signature so the login form's password
+  // field has somewhere to go; the mock backend doesn't validate it.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const login = useCallback((email: string, password: string) => {
-    const result = mockLogin(email, password);
+    const result = mockLogin(email);
     if (result.success && result.user) {
-      setUser(result.user);
       return { success: true };
     }
     return { success: false, error: result.error };
   }, []);
 
   const demoLogin = useCallback(() => {
-    const result = mockDemoLogin();
-    setUser(result.user);
+    mockDemoLogin();
   }, []);
 
   const logout = useCallback(() => {
     mockLogout();
-    setUser(null);
   }, []);
 
   const updateProfile = useCallback((profile: Profile) => {
     updateStoredUser(profile);
-    setUser(profile);
   }, []);
 
   return (

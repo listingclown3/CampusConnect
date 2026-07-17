@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
 import { useChat } from '@/lib/chat/context';
@@ -11,13 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function ChatPage() {
   const { user } = useAuth();
   const { conversations, isLoading, getUnreadForConversation, getLastMessageForConversation } = useChat();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted || isLoading) {
+  if (isLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-2xl mx-auto">
         <h1 className="text-xl font-bold mb-4">Messages</h1>
