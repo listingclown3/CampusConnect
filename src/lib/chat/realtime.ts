@@ -12,6 +12,7 @@ import {
   STORAGE_KEYS,
 } from '@/lib/data/storage';
 import { mockStudents } from '@/lib/mock-data/students';
+import { notifyStorageChange } from '@/lib/storage-sync';
 
 // ============================================================
 // Block helpers
@@ -41,6 +42,7 @@ export function addBlock(blockerId: string, blockedUserId: string): void {
     created_at: new Date().toISOString(),
   });
   localStorage.setItem(STORAGE_KEYS.BLOCKS, JSON.stringify(blocks));
+  notifyStorageChange();
 }
 
 export function isBlocked(userId: string, otherUserId: string): boolean {

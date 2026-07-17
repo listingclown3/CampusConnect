@@ -6,6 +6,7 @@ import {
   mockConversationMembers,
   mockMessages,
 } from '@/lib/mock-data/conversations';
+import { notifyStorageChange } from '@/lib/storage-sync';
 
 // ============================================================
 // Centralized localStorage key registry
@@ -47,6 +48,7 @@ export function getStoredConversations(): Conversation[] {
 export function setStoredConversations(convos: Conversation[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(convos));
+  notifyStorageChange();
 }
 
 // ============================================================
@@ -68,6 +70,7 @@ export function getStoredMembers(): ConversationMember[] {
 export function setStoredMembers(members: ConversationMember[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.CONVERSATION_MEMBERS, JSON.stringify(members));
+  notifyStorageChange();
 }
 
 // ============================================================
@@ -89,4 +92,5 @@ export function getStoredMessages(): Message[] {
 export function setStoredMessages(messages: Message[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+  notifyStorageChange();
 }

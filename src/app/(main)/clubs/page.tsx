@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { getClubs, getEvents } from '@/lib/mock-data';
 import { ClubCard } from '@/components/clubs/club-card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Building2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

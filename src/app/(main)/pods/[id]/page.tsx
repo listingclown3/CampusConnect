@@ -24,12 +24,11 @@ import { PodTypeBadge } from '@/components/pods/pod-type-badge';
 import { PodMembersList } from '@/components/pods/pod-members-list';
 import { PodMeetingTime } from '@/components/pods/pod-meeting-time';
 import { PodScoreBreakdown } from '@/components/pods/pod-score-breakdown';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getInitials, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
   MessageCircle,
@@ -215,7 +214,7 @@ export default function PodDetailPage() {
 
   if (!podData) return null;
 
-  const { memberProfiles, memberInfos, score, breakdown, meetingTimes, isMember, isFull, memberCount } = podData;
+  const { memberInfos, score, breakdown, meetingTimes, isMember, isFull, memberCount } = podData;
 
   return (
     <div className="p-4 lg:p-6 max-w-2xl mx-auto space-y-6 pb-8">

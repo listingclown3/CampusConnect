@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, use } from 'react';
+import { useEffect, useRef, useMemo, useSyncExternalStore, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
@@ -12,10 +12,10 @@ import { DateSeparator } from '@/components/chat/date-separator';
 import {
   getOtherUserInDirect,
   getUserDisplayName,
-  getConversationMembersList,
   addBlock,
   isBlocked,
 } from '@/lib/chat/realtime';
+import { subscribeToStorage } from '@/lib/storage-sync';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
@@ -39,27 +39,25 @@ export default function ChatRoomPage({ params }: PageProps) {
   } = useChat();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [blocked, setBlocked] = useState(false);
 
   // Load conversation
   useEffect(() => {
     setActiveConversation(conversationId);
-    setIsLoaded(true);
     return () => {
       setActiveConversation(null);
     };
   }, [conversationId, setActiveConversation]);
 
-  // Check if blocked (for direct chats)
-  useEffect(() => {
-    if (activeConversation?.type === 'direct' && user) {
-      const otherUserId = getOtherUserInDirect(conversationId, user.user_id);
-      if (otherUserId) {
-        setBlocked(isBlocked(user.user_id, otherUserId));
-      }
-    }
-  }, [activeConversation, user, conversationId]);
+  // Check if blocked (for direct chats), kept in sync with the block list
+  const directOtherUserId =
+    activeConversation?.type === 'direct' && user
+      ? getOtherUserInDirect(conversationId, user.user_id)
+      : null;
+  const getBlockedSnapshot = useMemo(
+    () => () => (user && directOtherUserId ? isBlocked(user.user_id, directOtherUserId) : false),
+    [user, directOtherUserId]
+  );
+  const blocked = useSyncExternalStore(subscribeToStorage, getBlockedSnapshot, getBlockedSnapshot);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -67,15 +65,6 @@ export default function ChatRoomPage({ params }: PageProps) {
   }, [activeMessages]);
 
   const userId = user?.user_id || '';
-
-  // Loading state
-  if (!isLoaded) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   // Access denied
   if (!canAccessConversation(conversationId)) {
@@ -138,12 +127,8 @@ export default function ChatRoomPage({ params }: PageProps) {
   };
 
   const handleBlock = () => {
-    if (activeConversation.type === 'direct' && user) {
-      const otherUserId = getOtherUserInDirect(conversationId, user.user_id);
-      if (otherUserId) {
-        addBlock(user.user_id, otherUserId);
-        setBlocked(true);
-      }
+    if (activeConversation.type === 'direct' && user && directOtherUserId) {
+      addBlock(user.user_id, directOtherUserId);
     }
   };
 

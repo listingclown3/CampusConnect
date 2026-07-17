@@ -5,12 +5,11 @@ import { useAuth } from '@/lib/auth/context';
 import { getEvents, getClubs, getClubById, getStudents, getStudentClassIds } from '@/lib/mock-data';
 import { recommendEvents } from '@/lib/matching/events';
 import { calculateMatchScore } from '@/lib/matching/score';
-import { getRsvpStatus, getAttendingMap, getEventInterestedCount } from '@/lib/data/event-actions';
+import { getRsvpStatus, getAttendingMap } from '@/lib/data/event-actions';
 import { getUserPodIds, getPodMembersForPod } from '@/lib/data/pod-actions';
 import { EventCard } from '@/components/events/event-card';
 import { ClubCard } from '@/components/clubs/club-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import { Calendar, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

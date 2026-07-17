@@ -10,7 +10,6 @@ interface MatchPreviewCardProps {
   name: string;
   major: string;
   compatibility: number;
-  avatarUrl?: string | null;
 }
 
 function getCompatibilityColor(score: number): string {
@@ -24,7 +23,6 @@ export function MatchPreviewCard({
   name,
   major,
   compatibility,
-  avatarUrl,
 }: MatchPreviewCardProps) {
   return (
     <Link href={`/matches/${userId}`}>

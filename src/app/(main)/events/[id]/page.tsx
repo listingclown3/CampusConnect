@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, use } from 'react';
+import { useEffect, useMemo, useState, useCallback, useSyncExternalStore, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/context';
 import { useChat } from '@/lib/chat/context';
@@ -16,11 +16,12 @@ import { generateEventRecommendationReason } from '@/lib/ai';
 import {
   getRsvpStatus,
   setRsvpStatus,
+  removeRsvp,
   getEventAttendees,
   getAttendingMap,
   getOrCreateEventConversation,
-  findEventConversation,
 } from '@/lib/data/event-actions';
+import { subscribeToStorage } from '@/lib/storage-sync';
 import { getUserPodIds, getPodMembersForPod } from '@/lib/data/pod-actions';
 import { RsvpButtons } from '@/components/events/rsvp-buttons';
 import { AttendeeList } from '@/components/events/attendee-list';
@@ -51,7 +52,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const { user, isLoading: authLoading } = useAuth();
   const { refreshConversations } = useChat();
 
-  const [rsvpStatus, setLocalRsvpStatus] = useState<RsvpStatus | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [explanation, setExplanation] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
@@ -67,15 +67,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     ? event.rsvp_count >= event.max_attendees
     : false;
 
-  // Load RSVP status
-  useEffect(() => {
-    if (user && event) {
-      setLocalRsvpStatus(getRsvpStatus(event.id, user.user_id));
-    }
-  }, [user, event, refreshKey]);
+  // RSVP status, kept in sync with storage
+  const getRsvpSnapshot = useCallback(
+    () => (user && event ? getRsvpStatus(event.id, user.user_id) : null),
+    [user, event]
+  );
+  const rsvpStatus = useSyncExternalStore(subscribeToStorage, getRsvpSnapshot, getRsvpSnapshot);
 
   // Compute recommendation score and connections
-  const { score, breakdown, reasons, attendeeInfos, matchedUserIds, podMemberIds } = useMemo(() => {
+  const { score, reasons, attendeeInfos, matchedUserIds, podMemberIds } = useMemo(() => {
     if (!user || !event) {
       return { score: 0, breakdown: null, reasons: [], attendeeInfos: [], matchedUserIds: [] as string[], podMemberIds: new Set<string>() };
     }
@@ -255,11 +255,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (!user || !event || isPast) return;
     // Toggle off if already selected
     if (rsvpStatus === status) {
-      setLocalRsvpStatus(null);
-      // We still store the last action; just toggle
+      removeRsvp(event.id, user.user_id);
     } else {
       setRsvpStatus(event.id, user.user_id, status);
-      setLocalRsvpStatus(status);
     }
     setRefreshKey((k) => k + 1);
   };

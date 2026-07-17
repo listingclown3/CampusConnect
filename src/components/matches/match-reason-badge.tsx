@@ -8,31 +8,23 @@ interface MatchReasonBadgeProps {
   className?: string;
 }
 
-function getReasonIcon(reason: string) {
-  const lowerReason = reason.toLowerCase();
-  if (lowerReason.includes('class') || lowerReason.includes('cs ') || lowerReason.includes('math') || lowerReason.includes('enrolled')) {
-    return BookOpen;
-  }
-  if (lowerReason.includes('schedule') || lowerReason.includes('time') || lowerReason.includes('available')) {
-    return Clock;
-  }
-  if (lowerReason.includes('career') || lowerReason.includes('goal')) {
-    return Briefcase;
-  }
-  if (lowerReason.includes('interest')) {
-    return Lightbulb;
-  }
-  if (lowerReason.includes('major')) {
-    return GraduationCap;
-  }
-  if (lowerReason.includes('skill') || lowerReason.includes('complementary')) {
-    return Sparkles;
-  }
-  return Lightbulb;
-}
-
 export function MatchReasonBadge({ reason, className }: MatchReasonBadgeProps) {
-  const Icon = getReasonIcon(reason);
+  const lowerReason = reason.toLowerCase();
+
+  let Icon = Lightbulb;
+  if (lowerReason.includes('class') || lowerReason.includes('cs ') || lowerReason.includes('math') || lowerReason.includes('enrolled')) {
+    Icon = BookOpen;
+  } else if (lowerReason.includes('schedule') || lowerReason.includes('time') || lowerReason.includes('available')) {
+    Icon = Clock;
+  } else if (lowerReason.includes('career') || lowerReason.includes('goal')) {
+    Icon = Briefcase;
+  } else if (lowerReason.includes('interest')) {
+    Icon = Lightbulb;
+  } else if (lowerReason.includes('major')) {
+    Icon = GraduationCap;
+  } else if (lowerReason.includes('skill') || lowerReason.includes('complementary')) {
+    Icon = Sparkles;
+  }
 
   return (
     <span

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, UsersRound, MessageCircle, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -43,8 +44,13 @@ export default function LandingPage() {
   };
 
   // If already authenticated, redirect
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
+
   if (isAuthenticated) {
-    router.push('/dashboard');
     return null;
   }
 

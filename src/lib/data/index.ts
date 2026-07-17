@@ -17,12 +17,12 @@ import type {
  * When configured, queries Supabase.
  */
 
-function useMockData(): boolean {
+function shouldUseMockData(): boolean {
   return !isSupabaseConfigured();
 }
 
 export async function getProfile(userId: string): Promise<Profile | null> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getStudentById(userId) ?? null;
   }
   // TODO: Query Supabase
@@ -30,14 +30,14 @@ export async function getProfile(userId: string): Promise<Profile | null> {
 }
 
 export async function getProfiles(): Promise<Profile[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getStudents();
   }
   return [];
 }
 
 export async function getMatches(userId: string): Promise<Profile[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     // Return all other visible students as potential matches
     return mockData
       .getStudents()
@@ -47,70 +47,70 @@ export async function getMatches(userId: string): Promise<Profile[]> {
 }
 
 export async function getClasses(): Promise<Class[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getClasses();
   }
   return [];
 }
 
 export async function getClassById(id: string): Promise<Class | null> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getClassById(id) ?? null;
   }
   return null;
 }
 
 export async function getClubs(): Promise<Club[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getClubs();
   }
   return [];
 }
 
 export async function getClubById(id: string): Promise<Club | null> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getClubById(id) ?? null;
   }
   return null;
 }
 
 export async function getEvents(): Promise<Event[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getEvents();
   }
   return [];
 }
 
 export async function getEventById(id: string): Promise<Event | null> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getEventById(id) ?? null;
   }
   return null;
 }
 
 export async function getPods(): Promise<Pod[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getPods();
   }
   return [];
 }
 
 export async function getPodById(id: string): Promise<Pod | null> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getPodById(id) ?? null;
   }
   return null;
 }
 
 export async function getPodMembers(podId: string): Promise<PodMember[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getPodMembers(podId);
   }
   return [];
 }
 
 export async function getUserPods(userId: string): Promise<Pod[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getUserPods(userId);
   }
   return [];
@@ -119,14 +119,14 @@ export async function getUserPods(userId: string): Promise<Pod[]> {
 export async function getConversations(
   userId: string
 ): Promise<Conversation[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getUserConversations(userId);
   }
   return [];
 }
 
 export async function getMessages(conversationId: string): Promise<Message[]> {
-  if (useMockData()) {
+  if (shouldUseMockData()) {
     return mockData.getMessages(conversationId);
   }
   return [];

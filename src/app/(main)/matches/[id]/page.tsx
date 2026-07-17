@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useSyncExternalStore } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/context';
 import {
@@ -30,6 +30,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { saveMatch, unsaveMatch, isMatchSaved } from '@/lib/data/match-actions';
+import { subscribeToStorage } from '@/lib/storage-sync';
 
 export default function MatchDetailPage() {
   const params = useParams();
@@ -40,11 +41,17 @@ export default function MatchDetailPage() {
   const [explanation, setExplanation] = useState<string>('');
   const [starterMessage, setStarterMessage] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
-  const [saved, setSaved] = useState(false);
 
   const matchedStudent = useMemo(() => {
     return getStudentById(matchId) || null;
   }, [matchId]);
+
+  // Saved state, kept in sync with storage
+  const getSavedSnapshot = useCallback(
+    () => (matchedStudent ? isMatchSaved(matchedStudent.user_id) : false),
+    [matchedStudent]
+  );
+  const saved = useSyncExternalStore(subscribeToStorage, getSavedSnapshot, getSavedSnapshot);
 
   const matchResult = useMemo(() => {
     if (!user || !matchedStudent) return null;
@@ -77,8 +84,6 @@ export default function MatchDetailPage() {
   useEffect(() => {
     if (!user || !matchedStudent || !matchResult) return;
 
-    setSaved(isMatchSaved(matchedStudent.user_id));
-
     const sharedClassNames = sharedClasses.map((c) => c.course_code);
     const currentUser = user;
     const currentMatch = matchedStudent;
@@ -107,10 +112,8 @@ export default function MatchDetailPage() {
     if (!matchedStudent) return;
     if (saved) {
       unsaveMatch(matchedStudent.user_id);
-      setSaved(false);
     } else {
       saveMatch(matchedStudent.user_id);
-      setSaved(true);
     }
   };
 

@@ -140,7 +140,7 @@ export function ChatHeader({
         open={showBlockReport}
         onOpenChange={setShowBlockReport}
         mode={blockReportMode}
-        onConfirm={(reason, description) => {
+        onConfirm={() => {
           if (blockReportMode === 'block' && onBlock) {
             onBlock();
           }
