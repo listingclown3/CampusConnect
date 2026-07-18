@@ -27,6 +27,7 @@ import {
   LogOut,
   Globe,
 } from 'lucide-react';
+import { CalendarExportButton } from '@/components/calendar/calendar-export-button';
 
 export default function ClubDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: clubId } = use(params);
@@ -180,6 +181,17 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             <Check className="w-4 h-4 mr-1.5" />
             Join Club
           </Button>
+        )}
+        {club.meeting_schedule && (
+          <CalendarExportButton
+            type="club"
+            data={{
+              name: club.name,
+              description: club.description,
+              meeting_schedule: club.meeting_schedule,
+              location: club.location,
+            }}
+          />
         )}
       </div>
 

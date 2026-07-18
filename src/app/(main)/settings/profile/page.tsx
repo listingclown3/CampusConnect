@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InterestTags } from '@/components/onboarding/interest-tags';
+import { SocialLinksManager } from '@/components/social-links/social-links-manager';
 import { useAuth } from '@/lib/auth/context';
 import type { Profile, StudentType, StudyStyle, CollaborationStyle } from '@/types/database';
 import { toast } from 'sonner';
@@ -203,6 +204,9 @@ export default function ProfileSettingsPage() {
       <Button onClick={handleSave} className="w-full h-11">
         Save Changes
       </Button>
+
+      {/* Social Links Section */}
+      <SocialLinksManager />
     </div>
   );
 }
