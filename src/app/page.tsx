@@ -91,7 +91,7 @@ export default function LandingPage() {
               size="lg"
               variant="outline"
               onClick={handleDemoLogin}
-              className="w-full sm:w-auto border-white/30 text-white hover:bg-white/10 hover:text-white px-8 h-12 text-base"
+              className="w-full sm:w-auto bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white px-8 h-12 text-base"
             >
               Demo Login
             </Button>
