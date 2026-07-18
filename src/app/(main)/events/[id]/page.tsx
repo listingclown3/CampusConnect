@@ -43,6 +43,7 @@ import {
   Building2,
   ExternalLink,
 } from 'lucide-react';
+import { CalendarExportButton } from '@/components/calendar/calendar-export-button';
 import type { Profile, RsvpStatus } from '@/types/database';
 import Link from 'next/link';
 
@@ -382,7 +383,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       {/* RSVP buttons */}
       <Card>
         <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">RSVP</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">RSVP</h3>
+            <CalendarExportButton
+              type="event"
+              data={{
+                title: event.title,
+                description: event.description,
+                location: event.location,
+                start_time: event.start_time,
+                end_time: event.end_time,
+              }}
+              compact
+            />
+          </div>
           <RsvpButtons
             currentStatus={rsvpStatus}
             onStatusChange={handleRsvp}

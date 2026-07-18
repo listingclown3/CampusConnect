@@ -13,6 +13,7 @@ import {
 } from '@/lib/data/storage';
 import { mockStudents } from '@/lib/mock-data/students';
 import { notifyStorageChange } from '@/lib/storage-sync';
+import { notifyNewMessage } from '@/lib/notifications/store';
 
 // ============================================================
 // Block helpers
@@ -170,6 +171,15 @@ export function sendMessage(
 
   // Mark as read for sender
   markConversationRead(conversationId, senderId);
+
+  // Trigger notification for other members in the conversation
+  const convMembers = getConversationMembersList(conversationId);
+  const senderName = getUserFirstName(senderId);
+  for (const member of convMembers) {
+    if (member.user_id !== senderId) {
+      notifyNewMessage(senderName, conversationId, content);
+    }
+  }
 
   return newMessage;
 }

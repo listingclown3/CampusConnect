@@ -3,23 +3,34 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth/context';
 import { getEvents, getClubById, getStudents, getStudentClassIds } from '@/lib/mock-data';
+import { getUserCreatedEvents } from '@/lib/data/crud-storage';
 import { recommendEvents } from '@/lib/matching/events';
 import { calculateMatchScore } from '@/lib/matching/score';
 import { getRsvpStatus, getAttendingMap } from '@/lib/data/event-actions';
 import { getUserPodIds, getPodMembersForPod } from '@/lib/data/pod-actions';
 import { EventCard } from '@/components/events/event-card';
+import { CreateEventDialog } from '@/components/events/create-event-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Calendar, Search, X, Sparkles, Clock, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type TimeFilter = 'upcoming' | 'past' | 'this_week' | 'this_month';
+type CategoryFilter = string | null;
 
 export default function EventsPage() {
   const { user, isLoading } = useAuth();
-  const [filter, setFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('upcoming');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(null);
+  const [search, setSearch] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const { recommended, allEvents } = useMemo(() => {
-    if (!user) return { recommended: [], allEvents: [] };
+  const { recommended, allEvents, categories } = useMemo(() => {
+    if (!user) return { recommended: [], allEvents: [], categories: [] };
 
-    const events = getEvents();
+    const mockEvents = getEvents();
+    const userEvents = getUserCreatedEvents();
+    const events = [...mockEvents, ...userEvents];
     const students = getStudents();
     const currentUserClasses = getStudentClassIds(user.user_id);
 
@@ -49,7 +60,7 @@ export default function EventsPage() {
     const recommendations = recommendEvents(user, events, {
       attendingMap,
       matchedUserIds: allConnectionIds,
-      limit: 8,
+      limit: 6,
     });
 
     // Sort all events chronologically
@@ -57,27 +68,78 @@ export default function EventsPage() {
       (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
     );
 
+    // Extract categories
+    const cats = [...new Set(events.map((e) => e.category))].sort();
+
     return {
       recommended: recommendations.filter((r) => r.score > 0),
       allEvents: sortedEvents,
+      categories: cats,
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, refreshKey]);
 
   const now = useMemo(() => new Date(), []);
+
   const filteredEvents = useMemo(() => {
-    return allEvents.filter((event) => {
-      const eventDate = new Date(event.start_time);
-      return filter === 'upcoming' ? eventDate >= now : eventDate < now;
-    });
-  }, [allEvents, filter, now]);
+    let results = allEvents;
+
+    // Time filter
+    switch (timeFilter) {
+      case 'upcoming':
+        results = results.filter((e) => new Date(e.start_time) >= now);
+        break;
+      case 'past':
+        results = results.filter((e) => new Date(e.start_time) < now);
+        break;
+      case 'this_week': {
+        const weekEnd = new Date(now);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        results = results.filter((e) => {
+          const d = new Date(e.start_time);
+          return d >= now && d <= weekEnd;
+        });
+        break;
+      }
+      case 'this_month': {
+        const monthEnd = new Date(now);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+        results = results.filter((e) => {
+          const d = new Date(e.start_time);
+          return d >= now && d <= monthEnd;
+        });
+        break;
+      }
+    }
+
+    // Category filter
+    if (categoryFilter) {
+      results = results.filter((e) => e.category === categoryFilter);
+    }
+
+    // Search
+    if (search) {
+      const q = search.toLowerCase();
+      results = results.filter((e) =>
+        e.title.toLowerCase().includes(q) ||
+        e.description.toLowerCase().includes(q) ||
+        e.location.toLowerCase().includes(q) ||
+        e.tags.some((t) => t.toLowerCase().includes(q)) ||
+        e.category.toLowerCase().includes(q)
+      );
+    }
+
+    return results;
+  }, [allEvents, timeFilter, categoryFilter, search, now]);
 
   if (isLoading) {
     return (
-      <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />
-        <div className="grid gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32" />
+        <Skeleton className="h-10 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-64" />
           ))}
         </div>
       </div>
@@ -85,15 +147,108 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-6 pb-24">
-      <h1 className="text-2xl font-bold">Events</h1>
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-6 pb-24">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Campus Events</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Discover workshops, socials, career fairs, and more happening on campus.
+            {allEvents.length > 0 && (
+              <> <span className="font-medium text-foreground">{allEvents.filter(e => new Date(e.start_time) >= now).length}</span> upcoming events available.</>
+            )}
+          </p>
+        </div>
+        <CreateEventDialog onCreated={() => setRefreshKey((k) => k + 1)} />
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search events by name, description, location, or tags..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 h-10"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Filters row */}
+      <div className="space-y-3">
+        {/* Time filters */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {[
+            { label: 'Upcoming', value: 'upcoming' as TimeFilter, icon: <Calendar className="w-3 h-3" /> },
+            { label: 'This Week', value: 'this_week' as TimeFilter, icon: <Clock className="w-3 h-3" /> },
+            { label: 'This Month', value: 'this_month' as TimeFilter },
+            { label: 'Past', value: 'past' as TimeFilter },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setTimeFilter(opt.value)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-all border flex items-center gap-1.5',
+                timeFilter === opt.value
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+              )}
+            >
+              {opt.icon}
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Category filters */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <button
+            onClick={() => setCategoryFilter(null)}
+            className={cn(
+              'px-3 py-1 text-[11px] font-medium rounded-full border transition-all',
+              !categoryFilter
+                ? 'bg-primary/10 text-primary border-primary/30'
+                : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+            )}
+          >
+            All Types
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+              className={cn(
+                'px-3 py-1 text-[11px] font-medium rounded-full border transition-all',
+                categoryFilter === cat
+                  ? 'bg-primary/10 text-primary border-primary/30'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Recommended section */}
-      {recommended.length > 0 && filter === 'upcoming' && (
+      {recommended.length > 0 && timeFilter === 'upcoming' && !search && !categoryFilter && (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Recommended For You</h2>
-          <div className="grid gap-3">
-            {recommended.map((rec) => {
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <h2 className="text-lg font-semibold">Recommended For You</h2>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Based on your interests, major, and what your connections are attending
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {recommended.slice(0, 6).map((rec) => {
               const club = rec.event.club_id ? getClubById(rec.event.club_id) : undefined;
               const isPast = new Date(rec.event.start_time) < now;
               const rsvpStatus = user ? getRsvpStatus(rec.event.id, user.user_id) : null;
@@ -112,47 +267,33 @@ export default function EventsPage() {
         </section>
       )}
 
-      {/* Filter tabs */}
+      {/* All events */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">All Events</h2>
-          <div className="flex gap-1 p-0.5 bg-muted rounded-md">
-            <button
-              onClick={() => setFilter('upcoming')}
-              className={cn(
-                'px-3 py-1 text-xs font-medium rounded transition-all',
-                filter === 'upcoming'
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              Upcoming
-            </button>
-            <button
-              onClick={() => setFilter('past')}
-              className={cn(
-                'px-3 py-1 text-xs font-medium rounded transition-all',
-                filter === 'past'
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              Past
-            </button>
-          </div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">
+            {search ? 'Search Results' : categoryFilter ? `${categoryFilter} Events` : 'All Events'}
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {filteredEvents.length === 0 ? (
-          <div className="text-center py-12 space-y-3">
-            <Calendar className="w-12 h-12 mx-auto text-muted-foreground" />
-            <p className="text-muted-foreground">
-              {filter === 'upcoming'
-                ? 'No upcoming events scheduled.'
+          <div className="text-center py-16 space-y-3">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <Calendar className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="font-semibold">No events found</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              {search
+                ? `No events matching "${search}". Try different keywords.`
+                : timeFilter === 'upcoming'
+                ? 'No upcoming events scheduled. Check back soon!'
                 : 'No past events to show.'}
             </p>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredEvents.map((event) => {
               const club = event.club_id ? getClubById(event.club_id) : undefined;
               const isPast = new Date(event.start_time) < now;

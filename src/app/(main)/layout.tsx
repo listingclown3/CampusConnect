@@ -7,6 +7,7 @@ import { Settings } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
 import { BottomNav } from '@/components/navigation/bottom-nav';
 import { Sidebar } from '@/components/navigation/sidebar';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getInitials } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,7 +61,8 @@ export default function MainLayout({
               </Link>
             </div>
             <div className="hidden lg:block" />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <NotificationBell />
               <Link href="/settings" className="p-2 rounded-lg hover:bg-muted transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label="Settings">
                 <Settings className="w-5 h-5 text-muted-foreground" />
               </Link>
