@@ -297,6 +297,12 @@ export function subscribeToConversation(
   conversationId: string,
   onMessage: MessageCallback
 ): { unsubscribe: () => void } {
+  // Guard against re-subscribing to a conversation that already has a live
+  // subscription (e.g. React effect double-invocation in dev, or rapid
+  // navigation) — leaves a fully torn-down channel behind so `client.channel()`
+  // below can't hand back an already-joined instance.
+  unsubscribeFromConversation(conversationId);
+
   if (!isSupabaseConfigured()) {
     // In mock mode, no real-time subscription needed
     // Messages are read from localStorage directly
@@ -330,7 +336,11 @@ export function subscribeToConversation(
 
   const sub = {
     unsubscribe: () => {
-      channel.unsubscribe();
+      // Must use removeChannel (not channel.unsubscribe()) so the channel is
+      // also removed from the client's internal registry — otherwise the next
+      // client.channel() call for this topic returns the stale, already-joined
+      // instance and `.on()` throws "... after subscribe()".
+      client.removeChannel(channel);
       subscriptions.delete(conversationId);
     },
   };
