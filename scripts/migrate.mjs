@@ -1,6 +1,15 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
+if (process.env.VERCEL) {
+  // Vercel builds (production and every PR preview) share this script via the
+  // prebuild hook. Auto-pushing schema migrations from a build container isn't
+  // safe here — concurrent preview builds could race against each other and
+  // against prod. Run `pnpm db:migrate` locally/in CI before deploying instead.
+  console.log('[migrate] Running on Vercel — skipping automatic migrations.');
+  process.exit(0);
+}
+
 const envPath = new URL('../.env.local', import.meta.url);
 if (existsSync(envPath)) {
   process.loadEnvFile(envPath);

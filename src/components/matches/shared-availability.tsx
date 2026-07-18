@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import type { Availability, DayOfWeek, TimeSlot } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -39,8 +40,8 @@ export function SharedAvailability({ availabilityA, availabilityB }: SharedAvail
 
         {/* Slot rows */}
         {SLOTS.map((slot) => (
-          <>
-            <div key={`label-${slot.key}`} className="text-muted-foreground font-medium flex items-center pr-1">
+          <Fragment key={slot.key}>
+            <div className="text-muted-foreground font-medium flex items-center pr-1">
               {slot.label}
             </div>
             {DAYS.map((day) => {
@@ -61,7 +62,7 @@ export function SharedAvailability({ availabilityA, availabilityB }: SharedAvail
                 />
               );
             })}
-          </>
+          </Fragment>
         ))}
       </div>
 
