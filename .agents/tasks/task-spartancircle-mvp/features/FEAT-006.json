@@ -1,0 +1,38 @@
+{
+  "id": "FEAT-006",
+  "type": "feat",
+  "description": "Events, clubs, and campus pages: Event listing with recommendations, event detail with RSVP, event chat, club listing, club detail, and recommendation scoring with explanations.",
+  "status": "completed",
+  "steps": [
+    "Create src/app/(main)/events/page.tsx - Events page with two sections: 'Recommended For You' (scored and explained) and 'All Events' (chronological). Each event card shows: name, date/time, location, club/org host, attendee count, 'Why recommended' snippet, RSVP button. Filter by upcoming/past. Empty state.",
+    "Create src/components/events/event-card.tsx - Event card with name, date, location, host badge, attendee count, recommendation reason badge, RSVP status indicator, and RSVP action button.",
+    "Create src/components/events/recommendation-reason.tsx - Small component showing why an event was recommended (interest match, major relevance, friends attending, etc.).",
+    "Create src/app/(main)/events/[id]/page.tsx - Event detail page: event name, full description, date/time/location, host club link, attendee list (showing matches/pod members who are going), recommendation explanation using generateEventRecommendationReason, RSVP buttons (Interested/Going/Not Going), 'Join Event Chat' button (available if RSVP is Going), event scoring breakdown (interest_tag_match 30, major_relevance 20, career_goal_relevance 20, matches_attending 20, availability_fit 10).",
+    "Create src/components/events/rsvp-buttons.tsx - Three-state RSVP buttons: Interested (yellow), Going (green), Not Going (gray). Only one active at a time.",
+    "Create src/components/events/attendee-list.tsx - List of attendees with badges for 'Your Match' or 'Pod Member' if applicable.",
+    "Create src/app/(main)/clubs/page.tsx - Clubs listing page with all 10 clubs. Each card shows: name, description, member count, category tag, events count. Search/filter by category.",
+    "Create src/components/clubs/club-card.tsx - Club card with name, short description, member count, and category badge.",
+    "Create src/app/(main)/clubs/[id]/page.tsx - Club detail page: name, full description, member list, upcoming events by this club, related clubs, Join/Leave button.",
+    "Wire up event recommendations: use recommendEvents from lib/matching/events.ts to score events for current user. Show top recommendations with explanations.",
+    "Wire up RSVP actions: update rsvp status in data layer. Going status grants access to event chat conversation.",
+    "Show matches/pod members attending: for each event, check if any of the user's matches or pod members have RSVP'd Going and display them.",
+    "Handle edge cases: past events (show as past, disable RSVP), no events state, no clubs state, event at capacity (if applicable)."
+  ],
+  "acceptance_criteria": [
+    "Events page shows recommended events with explanations and all events chronologically",
+    "Event detail shows full info, attendees, recommendation reason, and RSVP buttons",
+    "RSVP buttons cycle through Interested/Going/Not Going states",
+    "Going RSVP grants access to event chat",
+    "Clubs page lists all 10 clubs with descriptions",
+    "Club detail shows events hosted by that club",
+    "Matches/pod members attending are highlighted on event pages",
+    "Past events are visually distinguished and have disabled RSVP",
+    "pnpm build succeeds"
+  ],
+  "verification": [
+    "pnpm build",
+    "pnpm test"
+  ],
+  "blocked_reason": null,
+  "findings": "All pages build successfully and tests pass (52/52). Created event-actions.ts for localStorage RSVP persistence and club membership. Campus page uses tab navigation (Events | Clubs). Event detail page uses the existing scoring logic directly for the breakdown display. Event chat integration creates/navigates to event conversations using the shared localStorage conversation store. The Event type in the actual codebase uses start_time/end_time instead of event_date/start_time/end_time separate fields. Club type has tags, location, instagram_handle, website_url fields beyond what the briefing described."
+}

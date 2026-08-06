@@ -1,0 +1,46 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Authentication, onboarding, and app shell: Landing page, demo login, signup, full onboarding flow, app layout with mobile bottom navigation, and settings pages.",
+  "status": "completed",
+  "steps": [
+    "Create src/app/layout.tsx as root layout with Inter font, metadata (title: SpartanCircle), theme-color meta tag (#0055A2), viewport meta for mobile, and global CSS import.",
+    "Create src/app/globals.css with Tailwind directives and CSS variables for the SJSU color theme (matching shadcn/ui theme format).",
+    "Create src/lib/auth/context.tsx - AuthProvider using React context that manages current user state. In mock mode, stores the demo user in localStorage. Provides login, logout, getCurrentUser functions.",
+    "Create src/lib/auth/mock-auth.ts - mock authentication that accepts demo credentials (email: demo@sjsu.edu, or any @sjsu.edu email) and sets current user from seed data.",
+    "Create src/app/page.tsx - Landing page with hero section: app name SpartanCircle, tagline about finding your campus community, CTA buttons for Get Started and Demo Login, feature highlights (Match, Pods, Chat, Campus), mobile-optimized layout with SJSU blue gradient.",
+    "Create src/app/(auth)/login/page.tsx - Login page with email/password form, SJSU email domain hint, Demo Login button that auto-fills demo credentials, link to signup.",
+    "Create src/app/(auth)/signup/page.tsx - Signup page with email/password/confirm fields, SJSU email validation hint, link to login.",
+    "Create src/app/(auth)/layout.tsx - Auth layout (centered card, no nav).",
+    "Create src/app/(main)/layout.tsx - Main app layout with mobile bottom navigation (Home, Matches, Pods, Chat, Campus icons from Lucide), desktop sidebar navigation, header with user avatar and settings link. Only accessible when authenticated.",
+    "Create src/components/navigation/bottom-nav.tsx - Mobile bottom navigation bar with 5 tabs using Lucide icons (Home, Users, UsersRound, MessageCircle, Calendar), active state highlighting with primary blue.",
+    "Create src/components/navigation/sidebar.tsx - Desktop sidebar navigation with same links plus Settings.",
+    "Create src/app/(main)/onboarding/page.tsx - Multi-step onboarding form collecting: Step 1 (name, student type: freshman/transfer, year, avatar upload placeholder), Step 2 (major from dropdown, intended major if undeclared, classes multi-select from seed class list), Step 3 (interests tags, career goals text, study style radio: solo/partner/group/flexible, collaboration style: leader/contributor/independent/adaptive), Step 4 (skills tags, preferred connection types checkboxes: friends/study_buddies/project_partners/club_buddies/commute_buddies/career_networking), Step 5 (availability grid Mon-Sun x morning/afternoon/evening/late_night with toggle cells, mock calendar import button), Step 6 (privacy settings: profile visibility, show email: no, show availability detail level). Use shadcn components throughout.",
+    "Create src/components/onboarding/step-indicator.tsx - Progress indicator showing current step out of total.",
+    "Create src/components/onboarding/availability-grid.tsx - Interactive grid component for selecting availability blocks.",
+    "Create src/components/onboarding/interest-tags.tsx - Tag selector component for interests with predefined options and custom input.",
+    "Create src/app/(main)/settings/profile/page.tsx - Edit profile page (same fields as onboarding, pre-filled).",
+    "Create src/app/(main)/settings/privacy/page.tsx - Privacy settings: hide profile from matching toggle, profile visibility (public/connections_only/hidden), show availability detail level.",
+    "Create src/app/(main)/settings/availability/page.tsx - Availability editor with the same grid component from onboarding plus mock calendar import.",
+    "Create src/app/(main)/settings/layout.tsx - Settings layout with back navigation and section tabs.",
+    "Create middleware.ts that checks auth state and redirects unauthenticated users to /auth/login (with exception for landing page and auth routes). In mock mode, checks localStorage flag via client-side redirect.",
+    "Ensure all pages are mobile-first responsive with proper spacing, touch targets, and readable typography on small screens."
+  ],
+  "acceptance_criteria": [
+    "Landing page renders with hero, CTA buttons, and feature highlights",
+    "Demo Login button logs in as a seeded student and redirects to dashboard",
+    "Onboarding flow progresses through all 6 steps and saves profile data",
+    "Availability grid allows toggling time slots and displays selected slots visually",
+    "Mobile bottom navigation shows on small screens with proper active states",
+    "Desktop sidebar shows on large screens",
+    "Settings pages render with pre-filled profile data",
+    "Unauthenticated users are redirected to login",
+    "pnpm build succeeds without errors"
+  ],
+  "verification": [
+    "pnpm build",
+    "pnpm test"
+  ],
+  "blocked_reason": null,
+  "findings": "1. The shadcn/ui components use @base-ui/react under the hood (not Radix UI). The Select onValueChange callback receives (value: string | null), requiring null guards on all handlers. 2. Next.js 16.2.10 shows a deprecation warning about middleware - recommends using 'proxy' instead. Middleware still works but is deprecated. 3. The Checkbox component uses onCheckedChange with boolean type that works fine. 4. Build produces clean output with all routes (16 pages) correctly statically generated. 5. All 52 existing tests continue to pass."
+}
