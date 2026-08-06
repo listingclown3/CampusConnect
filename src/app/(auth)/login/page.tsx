@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth/context';
+import { PIXEL_BUTTON, PIXEL_FONT } from '@/lib/pixel-style';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,7 +41,14 @@ export default function LoginPage() {
   return (
     <Card className="shadow-lg border-border/50">
       <CardHeader className="text-center space-y-2">
-        <CardTitle className="text-2xl font-bold">
+        <Image
+          src="/images/sammy-mascot.png"
+          alt="Sammy the Spartan"
+          width={56}
+          height={56}
+          className="mx-auto rounded-full"
+        />
+        <CardTitle className={`text-2xl font-bold ${PIXEL_FONT}`}>
           Welcome to <span className="text-primary">Spartan</span><span className="text-[#E5A823]">Circle</span>
         </CardTitle>
         <CardDescription>Sign in with your SJSU email to continue</CardDescription>
@@ -74,7 +83,7 @@ export default function LoginPage() {
             <p className="text-sm text-destructive font-medium">{error}</p>
           )}
 
-          <Button type="submit" className="w-full h-11" disabled={isLoading}>
+          <Button type="submit" className={`w-full h-11 ${PIXEL_BUTTON}`} disabled={isLoading}>
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
@@ -90,7 +99,7 @@ export default function LoginPage() {
 
         <Button
           variant="outline"
-          className="w-full h-11"
+          className={`w-full h-11 ${PIXEL_BUTTON}`}
           onClick={handleDemoLogin}
         >
           Try Demo Login

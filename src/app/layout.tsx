@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Pixelify_Sans } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/lib/auth/context';
 import { ChatProvider } from '@/lib/chat/context';
@@ -9,6 +9,13 @@ import './globals.css';
 const inter = Inter({
   variable: '--font-sans',
   subsets: ['latin'],
+});
+
+// Used only on landing/auth/onboarding to match SpartanCircle's pixel-art identity.
+const pixelifySans = Pixelify_Sans({
+  variable: '--font-pixel',
+  subsets: ['latin'],
+  weight: ['400', '700'],
 });
 
 export const metadata: Metadata = {
@@ -35,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${pixelifySans.variable} h-full antialiased`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0055A2" />

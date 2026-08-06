@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   Users, UsersRound, MessageCircle, Calendar, ArrowRight, Sparkles,
   Zap, Shield, Globe, BookOpen, Target, ChevronRight, Star,
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth/context';
 import { cn } from '@/lib/utils';
+import { PIXEL_BUTTON, PIXEL_FONT } from '@/lib/pixel-style';
 
 const features = [
   {
@@ -140,6 +142,16 @@ export default function LandingPage() {
           'relative z-10 text-center max-w-3xl mx-auto space-y-8 transition-all duration-1000',
           mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         )}>
+          {/* Mascot */}
+          <Image
+            src="/images/sammy-mascot.png"
+            alt="Sammy the Spartan"
+            width={80}
+            height={80}
+            className="mx-auto rounded-full"
+            priority
+          />
+
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm">
             <span className="w-2 h-2 rounded-full bg-[#E5A823] animate-pulse" />
@@ -147,7 +159,7 @@ export default function LandingPage() {
           </div>
 
           {/* Title */}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.1]">
+          <h1 className={cn('text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.1]', PIXEL_FONT)}>
             Your Campus.
             <br />
             <span className="text-[#E5A823]">Your Circle.</span>
@@ -164,7 +176,10 @@ export default function LandingPage() {
             <Button
               size="lg"
               onClick={handleGetStarted}
-              className="w-full sm:w-auto bg-[#E5A823] hover:bg-[#c48d1a] text-black font-bold px-10 h-14 text-base rounded-xl shadow-lg shadow-[#E5A823]/20 hover:shadow-[#E5A823]/30 transition-all hover:scale-105"
+              className={cn(
+                'w-full sm:w-auto bg-[#E5A823] hover:bg-[#c48d1a] text-black font-bold px-10 h-14 text-base rounded-xl transition-all hover:scale-105',
+                PIXEL_BUTTON
+              )}
             >
               Get Started Free
               <ArrowRight className="w-5 h-5 ml-2" />
