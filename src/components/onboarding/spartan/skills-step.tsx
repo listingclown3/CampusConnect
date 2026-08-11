@@ -4,6 +4,10 @@ import { useState } from 'react';
 import type { ConnectionType } from '@/types/database';
 import type { SpartanOnboardingState, SpartanStep } from './types';
 import { CONNECTION_LABEL_MAP } from './types';
+import { sanitizeText } from '@/lib/validation/text';
+
+const CUSTOM_SKILL_MAX_LENGTH = 40;
+const MAX_CUSTOM_SKILLS = 10;
 
 const exampleSkills = [
   'Coding 💻', 'Designing 🎨', 'Research 🔎', 'Speaking 🎤',
@@ -31,8 +35,11 @@ export function SkillsStep({ state, updateState, setStep }: SkillsStepProps) {
   }
 
   function addCustomSkill() {
-    const cleaned = customSkill.trim();
-    if (!cleaned) return;
+    const cleaned = sanitizeText(customSkill, CUSTOM_SKILL_MAX_LENGTH);
+    if (!cleaned || state.customSkills.length >= MAX_CUSTOM_SKILLS) {
+      setCustomSkill('');
+      return;
+    }
     const exists = [...state.selectedSkills, ...state.customSkills].some(
       (s) => s.toLowerCase() === cleaned.toLowerCase()
     );
@@ -88,7 +95,7 @@ export function SkillsStep({ state, updateState, setStep }: SkillsStepProps) {
             }
           }}
           placeholder="Add a custom skill..."
-          maxLength={40}
+          maxLength={CUSTOM_SKILL_MAX_LENGTH}
         />
         <button type="button" className="add-skill-button" onClick={addCustomSkill}>Add</button>
       </div>

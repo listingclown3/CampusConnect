@@ -3,36 +3,21 @@
 import { useState } from 'react';
 import type { Class } from '@/types/database';
 import type { SelectedCourse, SpartanOnboardingState, SpartanStep } from './types';
+import { SJSU_MAJORS } from './types';
+import { sanitizeText } from '@/lib/validation/text';
 
-// Full SJSU catalog (same 80-major list used by the standard onboarding form).
-const SJSU_MAJORS = [
-  'Advertising', 'Aerospace Engineering', 'African American Studies', 'Animation & Illustration',
-  'Anthropology', 'Applied Mathematics', 'Art', 'Art History and Visual Culture', 'Aviation',
-  'Behavioral Science', 'Biological Sciences', 'Biological Sciences - Ecology and Evolution',
-  'Biological Sciences - Marine Biology', 'Biomedical Engineering', 'Business Administration',
-  'Chemical Engineering', 'Chemistry', 'Chicana and Chicano Studies', 'Child and Adolescent Development',
-  'Chinese', 'Civil Engineering', 'Climate Science', 'Communication Studies',
-  'Communicative Disorders and Sciences', 'Computer Engineering', 'Computer Science', 'Creative Arts',
-  'Dance', 'Data Science', 'Design Studies', 'Earth System Science', 'Economics', 'Electrical Engineering',
-  'Engineering Technology', 'English', 'Environmental Studies', 'Forensic Science', 'French', 'Geography',
-  'Geology', 'Global Studies', 'Graphic Design', 'History', 'Humanities', 'Industrial Design',
-  'Industrial and Systems Engineering', 'Information Science and Data Analytics', 'Interdisciplinary Engineering',
-  'Interdisciplinary Studies', 'Interior Design', 'Japanese', 'Journalism', 'Justice Studies', 'Kinesiology',
-  'Liberal Studies', 'Linguistics', 'Materials Engineering', 'Mathematics', 'Mechanical Engineering',
-  'Meteorology', 'Music', 'Nursing', 'Nutritional Science', 'Organizational Studies', 'Packaging',
-  'Philosophy', 'Physics', 'Political Science', 'Psychology', 'Public Health', 'Public Relations',
-  'Radio-Television-Film', 'Recreation', 'Social Science', 'Social Work', 'Sociology', 'Software Engineering',
-  'Spanish', 'Statistics', 'Theatre Arts', 'Undeclared',
-];
+const MAJOR_MAX_LENGTH = 100;
+const CLASS_SEARCH_MAX_LENGTH = 60;
 
 interface AcademicsStepProps {
   state: SpartanOnboardingState;
   updateState: <K extends keyof SpartanOnboardingState>(key: K, value: SpartanOnboardingState[K]) => void;
   setStep: (step: SpartanStep) => void;
+  onNext: () => void;
   availableClasses: Class[];
 }
 
-export function AcademicsStep({ state, updateState, setStep, availableClasses }: AcademicsStepProps) {
+export function AcademicsStep({ state, updateState, setStep, onNext, availableClasses }: AcademicsStepProps) {
   const [classSearch, setClassSearch] = useState('');
 
   function addClass(course: SelectedCourse) {
@@ -67,7 +52,7 @@ export function AcademicsStep({ state, updateState, setStep, availableClasses }:
         className="major-search-input"
         list="sjsu-majors"
         value={state.major}
-        onChange={(e) => updateState('major', e.target.value)}
+        onChange={(e) => updateState('major', sanitizeText(e.target.value, MAJOR_MAX_LENGTH))}
         placeholder="Search for your current major"
         autoComplete="off"
       />
@@ -77,7 +62,7 @@ export function AcademicsStep({ state, updateState, setStep, availableClasses }:
         className="switch-major-search-input"
         list="sjsu-majors"
         value={state.plannedMajor}
-        onChange={(e) => updateState('plannedMajor', e.target.value)}
+        onChange={(e) => updateState('plannedMajor', sanitizeText(e.target.value, MAJOR_MAX_LENGTH))}
         placeholder="Search for a major you may switch to"
         autoComplete="off"
       />
@@ -93,7 +78,7 @@ export function AcademicsStep({ state, updateState, setStep, availableClasses }:
           type="text"
           className="class-search-input"
           value={classSearch}
-          onChange={(e) => setClassSearch(e.target.value)}
+          onChange={(e) => setClassSearch(sanitizeText(e.target.value, CLASS_SEARCH_MAX_LENGTH))}
           placeholder="Search by course code or title"
           autoComplete="off"
         />
@@ -141,7 +126,7 @@ export function AcademicsStep({ state, updateState, setStep, availableClasses }:
       </div>
 
       <button type="button" className="academics-back-button" onClick={() => setStep('basic')}>Back</button>
-      <button type="button" className="academics-next-button" onClick={() => setStep('interests')}>Next</button>
+      <button type="button" className="academics-next-button" onClick={onNext}>Next</button>
     </div>
   );
 }

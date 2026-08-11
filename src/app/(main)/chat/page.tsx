@@ -1,11 +1,15 @@
 'use client';
 
-import { MessageCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { MessageCircle, Loader2 } from 'lucide-react';
 import { useChat } from '@/lib/chat/context';
 import { ConversationListItem } from '@/components/chat/conversation-list-item';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ChatPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     conversations,
     isLoading,
@@ -13,7 +17,33 @@ export default function ChatPage() {
     getLastMessageForConversation,
     getOtherUserId,
     getDisplayName,
+    createOrFindDirectChat,
   } = useChat();
+
+  // "Message" buttons elsewhere (e.g. the match-detail page's conversation
+  // starter) link here as /chat?user=<id> — this used to be a dead end since
+  // nothing read the param. Create/find that direct conversation and hop
+  // straight into it.
+  const targetUserId = searchParams.get('user');
+  const [isStartingChat, setIsStartingChat] = useState(!!targetUserId);
+  const startedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!targetUserId || startedForRef.current === targetUserId) return;
+    startedForRef.current = targetUserId;
+    setIsStartingChat(true);
+    createOrFindDirectChat(targetUserId)
+      .then((conv) => router.replace(`/chat/${conv.id}`))
+      .catch(() => setIsStartingChat(false));
+  }, [targetUserId, createOrFindDirectChat, router]);
+
+  if (isStartingChat) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

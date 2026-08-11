@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import type { SpartanOnboardingState, SpartanStep } from './types';
 import { STUDY_STYLE_MAP, COLLABORATION_STYLE_MAP } from './types';
+import { sanitizeText } from '@/lib/validation/text';
+
+const CUSTOM_INTEREST_MAX_LENGTH = 40;
+const CAREER_GOALS_MAX_LENGTH = 150;
+const MAX_CUSTOM_INTERESTS = 10;
 
 const exampleInterests = [
   'Music 🎵', 'Sports 🏀', 'Art 🎨', 'Gaming 🎮', 'Reading 📚',
@@ -30,8 +35,11 @@ export function InterestsStep({ state, updateState, setStep }: InterestsStepProp
   }
 
   function addCustomInterest() {
-    const cleaned = customInterest.trim();
-    if (!cleaned) return;
+    const cleaned = sanitizeText(customInterest, CUSTOM_INTEREST_MAX_LENGTH);
+    if (!cleaned || state.customInterests.length >= MAX_CUSTOM_INTERESTS) {
+      setCustomInterest('');
+      return;
+    }
     const exists = [...state.selectedInterests, ...state.customInterests].some(
       (i) => i.toLowerCase() === cleaned.toLowerCase()
     );
@@ -77,7 +85,7 @@ export function InterestsStep({ state, updateState, setStep }: InterestsStepProp
             }
           }}
           placeholder="Add a custom interest..."
-          maxLength={40}
+          maxLength={CUSTOM_INTEREST_MAX_LENGTH}
         />
         <button type="button" className="add-interest-button" onClick={addCustomInterest}>Add</button>
       </div>
@@ -103,9 +111,9 @@ export function InterestsStep({ state, updateState, setStep }: InterestsStepProp
       <textarea
         className="career-goals-input"
         value={state.careerGoals}
-        onChange={(e) => updateState('careerGoals', e.target.value)}
+        onChange={(e) => updateState('careerGoals', e.target.value.slice(0, CAREER_GOALS_MAX_LENGTH))}
         placeholder="For example: teacher, filmmaker, nurse..."
-        maxLength={150}
+        maxLength={CAREER_GOALS_MAX_LENGTH}
         rows={2}
       />
 

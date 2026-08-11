@@ -1,6 +1,10 @@
 'use client';
 
 import type { SpartanOnboardingState, SpartanStep } from './types';
+import { sanitizeText } from '@/lib/validation/text';
+
+const INSTAGRAM_MAX_LENGTH = 50;
+const LINKEDIN_MAX_LENGTH = 120;
 
 interface PrivacyStepProps {
   state: SpartanOnboardingState;
@@ -66,10 +70,10 @@ export function PrivacyStep({ state, updateState, setStep, onComplete, isSaving 
           <input
             type="text"
             value={state.instagramHandle}
-            onChange={(e) => updateState('instagramHandle', e.target.value)}
+            onChange={(e) => updateState('instagramHandle', sanitizeText(e.target.value, INSTAGRAM_MAX_LENGTH))}
             placeholder="@username"
             autoComplete="off"
-            maxLength={50}
+            maxLength={INSTAGRAM_MAX_LENGTH}
           />
         </label>
 
@@ -78,10 +82,10 @@ export function PrivacyStep({ state, updateState, setStep, onComplete, isSaving 
           <input
             type="text"
             value={state.linkedinUrl}
-            onChange={(e) => updateState('linkedinUrl', e.target.value)}
+            onChange={(e) => updateState('linkedinUrl', sanitizeText(e.target.value, LINKEDIN_MAX_LENGTH))}
             placeholder="Profile link or username"
             autoComplete="off"
-            maxLength={120}
+            maxLength={LINKEDIN_MAX_LENGTH}
           />
         </label>
       </div>

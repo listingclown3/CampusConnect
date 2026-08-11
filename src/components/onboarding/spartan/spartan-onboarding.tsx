@@ -16,7 +16,14 @@ import { InterestsStep } from './interests-step';
 import { SkillsStep } from './skills-step';
 import { AvailabilityStep } from './availability-step';
 import { PrivacyStep } from './privacy-step';
-import { DEFAULT_SPARTAN_STATE, deriveAvailability, type SpartanOnboardingState, type SpartanStep } from './types';
+import {
+  DEFAULT_SPARTAN_STATE,
+  deriveAvailability,
+  isValidMajor,
+  normalizeMajor,
+  type SpartanOnboardingState,
+  type SpartanStep,
+} from './types';
 
 const NAME_MAX_LENGTH = 50;
 const CAREER_GOAL_MAX_LENGTH = 60;
@@ -40,8 +47,34 @@ export function SpartanOnboarding({ initialClasses }: SpartanOnboardingProps) {
     []
   );
 
+  const goToAcademics = useCallback(() => {
+    if (!state.firstName.trim() || !state.lastName.trim()) {
+      toast.error('Please enter your first and last name.');
+      return;
+    }
+    setStep('academics');
+  }, [state.firstName, state.lastName]);
+
+  const goToInterests = useCallback(() => {
+    if (!isValidMajor(state.major)) {
+      toast.error('Please select a major from the list.');
+      return;
+    }
+    setStep('interests');
+  }, [state.major]);
+
   const handleComplete = useCallback(async () => {
     if (!userId) return;
+    if (!state.firstName.trim() || !state.lastName.trim()) {
+      toast.error('Please go back and enter your first and last name.');
+      setStep('basic');
+      return;
+    }
+    if (!isValidMajor(state.major)) {
+      toast.error('Please go back and select a major from the list.');
+      setStep('academics');
+      return;
+    }
     setIsSaving(true);
     try {
       const firstName = sanitizeText(state.firstName, NAME_MAX_LENGTH) || user?.first_name || '';
@@ -91,8 +124,8 @@ export function SpartanOnboarding({ initialClasses }: SpartanOnboardingProps) {
         student_type: state.studentType,
         graduation_year: state.graduationYear,
         avatar_url: state.avatarDataUrl,
-        major: state.major || base.major || 'Undeclared',
-        intended_major: state.plannedMajor || null,
+        major: normalizeMajor(state.major) ?? base.major,
+        intended_major: normalizeMajor(state.plannedMajor),
         interests: [
           ...state.selectedInterests.map(stripEmoji),
           ...state.customInterests,
@@ -124,9 +157,17 @@ export function SpartanOnboarding({ initialClasses }: SpartanOnboardingProps) {
     case 'landing':
       return <LandingStep setStep={setStep} />;
     case 'basic':
-      return <BasicsStep state={state} updateState={updateState} setStep={setStep} />;
+      return <BasicsStep state={state} updateState={updateState} setStep={setStep} onNext={goToAcademics} />;
     case 'academics':
-      return <AcademicsStep state={state} updateState={updateState} setStep={setStep} availableClasses={initialClasses} />;
+      return (
+        <AcademicsStep
+          state={state}
+          updateState={updateState}
+          setStep={setStep}
+          onNext={goToInterests}
+          availableClasses={initialClasses}
+        />
+      );
     case 'interests':
       return <InterestsStep state={state} updateState={updateState} setStep={setStep} />;
     case 'skills':

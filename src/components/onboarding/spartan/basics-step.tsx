@@ -12,9 +12,10 @@ interface BasicsStepProps {
   state: SpartanOnboardingState;
   updateState: <K extends keyof SpartanOnboardingState>(key: K, value: SpartanOnboardingState[K]) => void;
   setStep: (step: SpartanStep) => void;
+  onNext: () => void;
 }
 
-export function BasicsStep({ state, updateState, setStep }: BasicsStepProps) {
+export function BasicsStep({ state, updateState, setStep, onNext }: BasicsStepProps) {
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -100,7 +101,7 @@ export function BasicsStep({ state, updateState, setStep }: BasicsStepProps) {
       </label>
 
       <button type="button" className="basics-back-button" onClick={() => setStep('landing')} aria-label="Back" />
-      <button type="button" className="next-academics-button" onClick={() => setStep('academics')} aria-label="Next" />
+      <button type="button" className="next-academics-button" onClick={onNext} aria-label="Next" />
 
       {imageToCrop && (
         <div className="crop-modal-background">

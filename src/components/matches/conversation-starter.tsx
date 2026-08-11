@@ -27,8 +27,13 @@ export function ConversationStarter({ message, targetUserId }: ConversationStart
     }
   };
 
-  const handleUseMessage = () => {
-    router.push(`/chat?user=${targetUserId}&message=${encodeURIComponent(message)}`);
+  const handleUseMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message);
+    } catch {
+      // Clipboard API unavailable — the message is still shown on-screen to copy manually.
+    }
+    router.push(`/chat?user=${targetUserId}`);
   };
 
   return (

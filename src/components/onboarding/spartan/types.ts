@@ -6,6 +6,37 @@ import type {
   Availability,
 } from '@/types/database';
 
+// Full SJSU catalog (same 80-major list used by the standard onboarding form).
+export const SJSU_MAJORS = [
+  'Advertising', 'Aerospace Engineering', 'African American Studies', 'Animation & Illustration',
+  'Anthropology', 'Applied Mathematics', 'Art', 'Art History and Visual Culture', 'Aviation',
+  'Behavioral Science', 'Biological Sciences', 'Biological Sciences - Ecology and Evolution',
+  'Biological Sciences - Marine Biology', 'Biomedical Engineering', 'Business Administration',
+  'Chemical Engineering', 'Chemistry', 'Chicana and Chicano Studies', 'Child and Adolescent Development',
+  'Chinese', 'Civil Engineering', 'Climate Science', 'Communication Studies',
+  'Communicative Disorders and Sciences', 'Computer Engineering', 'Computer Science', 'Creative Arts',
+  'Dance', 'Data Science', 'Design Studies', 'Earth System Science', 'Economics', 'Electrical Engineering',
+  'Engineering Technology', 'English', 'Environmental Studies', 'Forensic Science', 'French', 'Geography',
+  'Geology', 'Global Studies', 'Graphic Design', 'History', 'Humanities', 'Industrial Design',
+  'Industrial and Systems Engineering', 'Information Science and Data Analytics', 'Interdisciplinary Engineering',
+  'Interdisciplinary Studies', 'Interior Design', 'Japanese', 'Journalism', 'Justice Studies', 'Kinesiology',
+  'Liberal Studies', 'Linguistics', 'Materials Engineering', 'Mathematics', 'Mechanical Engineering',
+  'Meteorology', 'Music', 'Nursing', 'Nutritional Science', 'Organizational Studies', 'Packaging',
+  'Philosophy', 'Physics', 'Political Science', 'Psychology', 'Public Health', 'Public Relations',
+  'Radio-Television-Film', 'Recreation', 'Social Science', 'Social Work', 'Sociology', 'Software Engineering',
+  'Spanish', 'Statistics', 'Theatre Arts', 'Undeclared',
+];
+
+const SJSU_MAJORS_BY_LOWER = new Map(SJSU_MAJORS.map((m) => [m.toLowerCase(), m]));
+export function isValidMajor(value: string): boolean {
+  return SJSU_MAJORS_BY_LOWER.has(value.trim().toLowerCase());
+}
+/** Canonical casing for a major, regardless of how the user typed it into
+ * the free-text datalist input. */
+export function normalizeMajor(value: string): string | null {
+  return SJSU_MAJORS_BY_LOWER.get(value.trim().toLowerCase()) ?? null;
+}
+
 export type SpartanStep =
   | 'landing'
   | 'basic'
