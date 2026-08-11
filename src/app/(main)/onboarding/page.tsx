@@ -1,7 +1,7 @@
 import { getClasses } from '@/lib/data';
-import { OnboardingForm } from './onboarding-form';
+import { SpartanOnboarding } from '@/components/onboarding/spartan/spartan-onboarding';
 
 export default async function OnboardingPage() {
   const classes = await getClasses();
-  return <OnboardingForm initialClasses={classes} />;
+  return <SpartanOnboarding initialClasses={classes} />;
 }
