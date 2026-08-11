@@ -1,15 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback, useSyncExternalStore, use } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/context';
 import { useChat } from '@/lib/chat/context';
-import {
-  getEventById,
-  getClubById,
-  getStudents,
-  getStudentClassIds,
-} from '@/lib/mock-data';
+import { getEventById, getClubById, getVisibleProfiles, getUserClassIds, getUserClassIdsForUsers } from '@/lib/data/client';
 import { recommendEvents } from '@/lib/matching/events';
 import { calculateMatchScore } from '@/lib/matching/score';
 import { generateEventRecommendationReason } from '@/lib/ai';
@@ -21,7 +16,6 @@ import {
   getAttendingMap,
   getOrCreateEventConversation,
 } from '@/lib/data/event-actions';
-import { subscribeToStorage } from '@/lib/storage-sync';
 import { getUserPodIds, getPodMembersForPod } from '@/lib/data/pod-actions';
 import { RsvpButtons } from '@/components/events/rsvp-buttons';
 import { AttendeeList } from '@/components/events/attendee-list';
@@ -44,7 +38,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { CalendarExportButton } from '@/components/calendar/calendar-export-button';
-import type { Profile, RsvpStatus } from '@/types/database';
+import type { Profile, RsvpStatus, Event, Club } from '@/types/database';
 import Link from 'next/link';
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -56,169 +50,181 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [refreshKey, setRefreshKey] = useState(0);
   const [explanation, setExplanation] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  const event = useMemo(() => getEventById(eventId), [eventId]);
-  const club = useMemo(
-    () => (event?.club_id ? getClubById(event.club_id) : undefined),
-    [event]
-  );
+  const [event, setEvent] = useState<Event | null>(null);
+  const [club, setClub] = useState<Club | undefined>(undefined);
+  const [rsvpStatus, setRsvpStatusState] = useState<RsvpStatus | null>(null);
+  const [score, setScore] = useState(0);
+  const [reasons, setReasons] = useState<string[]>([]);
+  const [attendeeInfos, setAttendeeInfos] = useState<{ profile: Profile; isMatch: boolean; isPodMember: boolean }[]>([]);
+  const [scoreBreakdown, setScoreBreakdown] = useState<{
+    interest_tag_match: number;
+    major_relevance: number;
+    career_goal_relevance: number;
+    matches_or_pod_attending: number;
+    availability_fit: number;
+  } | null>(null);
 
   const isPast = event ? new Date(event.start_time) < new Date() : false;
   const isFull = event?.max_attendees
     ? event.rsvp_count >= event.max_attendees
     : false;
 
-  // RSVP status, kept in sync with storage
-  const getRsvpSnapshot = useCallback(
-    () => (user && event ? getRsvpStatus(event.id, user.user_id) : null),
-    [user, event]
-  );
-  const rsvpStatus = useSyncExternalStore(subscribeToStorage, getRsvpSnapshot, getRsvpSnapshot);
+  // Fetch event, club, RSVP status, and recommendation/score data together.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-  // Compute recommendation score and connections
-  const { score, reasons, attendeeInfos, matchedUserIds, podMemberIds } = useMemo(() => {
-    if (!user || !event) {
-      return { score: 0, breakdown: null, reasons: [], attendeeInfos: [], matchedUserIds: [] as string[], podMemberIds: new Set<string>() };
-    }
+    (async () => {
+      setDataLoading(true);
+      const ev = await getEventById(eventId);
+      if (cancelled) return;
+      setEvent(ev);
 
-    const students = getStudents();
-    const currentUserClasses = getStudentClassIds(user.user_id);
-
-    // Build matched user IDs
-    const matchedIds = students
-      .filter((s) => s.user_id !== user.user_id)
-      .filter((s) => {
-        const studentClasses = getStudentClassIds(s.user_id);
-        const result = calculateMatchScore(user, s, currentUserClasses, studentClasses);
-        return result.score >= 50;
-      })
-      .map((s) => s.user_id);
-
-    // Pod members
-    const userPodIds = getUserPodIds(user.user_id);
-    const podMemIds = new Set<string>();
-    for (const podId of userPodIds) {
-      const members = getPodMembersForPod(podId);
-      for (const m of members) {
-        if (m.user_id !== user.user_id) podMemIds.add(m.user_id);
+      if (!ev) {
+        setDataLoading(false);
+        return;
       }
-    }
 
-    const allConnectionIds = [...new Set([...matchedIds, ...podMemIds])];
-    const attendingMap = getAttendingMap();
+      const [cl, students, currentUserClasses, rsvp] = await Promise.all([
+        ev.club_id ? getClubById(ev.club_id) : Promise.resolve(null),
+        getVisibleProfiles(user.user_id),
+        getUserClassIds(user.user_id),
+        getRsvpStatus(ev.id, user.user_id),
+      ]);
+      if (cancelled) return;
 
-    const recs = recommendEvents(user, [event], {
-      attendingMap,
-      matchedUserIds: allConnectionIds,
-      limit: 1,
-    });
+      const classIdsByUser = await getUserClassIdsForUsers(students.map((s) => s.user_id));
+      if (cancelled) return;
 
-    const rec = recs[0];
+      // Build matched user IDs
+      const matchedIds = students
+        .filter((s) => {
+          const studentClasses = classIdsByUser[s.user_id] ?? [];
+          const result = calculateMatchScore(user, s, currentUserClasses, studentClasses);
+          return result.score >= 50;
+        })
+        .map((s) => s.user_id);
 
-    // Build attendee info
-    const attendeeIds = getEventAttendees(event.id);
-    const attendeeProfiles: { profile: Profile; isMatch: boolean; isPodMember: boolean }[] = [];
-    for (const uid of attendeeIds) {
-      if (uid === user.user_id) continue;
-      const profile = students.find((s) => s.user_id === uid);
-      if (profile) {
-        attendeeProfiles.push({
-          profile,
-          isMatch: matchedIds.includes(uid),
-          isPodMember: podMemIds.has(uid),
-        });
+      // Pod members
+      const userPodIds = await getUserPodIds(user.user_id);
+      const podMemIds = new Set<string>();
+      for (const podId of userPodIds) {
+        const members = await getPodMembersForPod(podId);
+        for (const m of members) {
+          if (m.user_id !== user.user_id) podMemIds.add(m.user_id);
+        }
       }
-    }
+      if (cancelled) return;
 
-    return {
-      score: rec?.score ?? 0,
-      breakdown: rec ? {
-        interest_tag_match: Math.round((rec.score / 100) * 30), // Approximate breakdown
-        major_relevance: rec.reasons.some((r) => r.includes('major')) ? 20 : 0,
-        career_goal_relevance: rec.reasons.some((r) => r.includes('career')) ? 20 : 0,
-        matches_or_pod_attending: rec.reasons.some((r) => r.includes('connections')) ? 20 : 0,
-        availability_fit: rec.reasons.some((r) => r.includes('schedule')) ? 10 : 0,
-      } : null,
-      reasons: rec?.reasons ?? [],
-      attendeeInfos: attendeeProfiles,
-      matchedUserIds: matchedIds,
-      podMemberIds: podMemIds,
+      const allConnectionIds = [...new Set([...matchedIds, ...podMemIds])];
+      const attendingMap = await getAttendingMap();
+      if (cancelled) return;
+
+      const recs = recommendEvents(user, [ev], {
+        attendingMap,
+        matchedUserIds: allConnectionIds,
+        limit: 1,
+      });
+
+      const rec = recs[0];
+
+      // Build attendee info
+      const attendeeIds = await getEventAttendees(ev.id);
+      if (cancelled) return;
+      const attendeeProfiles: { profile: Profile; isMatch: boolean; isPodMember: boolean }[] = [];
+      for (const uid of attendeeIds) {
+        if (uid === user.user_id) continue;
+        const profile = students.find((s) => s.user_id === uid);
+        if (profile) {
+          attendeeProfiles.push({
+            profile,
+            isMatch: matchedIds.includes(uid),
+            isPodMember: podMemIds.has(uid),
+          });
+        }
+      }
+
+      // Compute real breakdown using the scoring logic
+      const userInterests = user.interests.map((i) => i.toLowerCase());
+      const eventTags = ev.tags.map((t) => t.toLowerCase());
+      const matchedTags = eventTags.filter((tag) =>
+        userInterests.some(
+          (interest) => interest.includes(tag) || tag.includes(interest)
+        )
+      );
+      const interestScore = Math.min(
+        Math.round((matchedTags.length / Math.max(eventTags.length, 1)) * 30),
+        30
+      );
+
+      const MAJOR_CATEGORY_MAP: Record<string, string[]> = {
+        'Computer Science': ['Technology', 'Workshop', 'Competition', 'Career'],
+        'Software Engineering': ['Technology', 'Workshop', 'Competition', 'Career'],
+        'Data Science': ['Technology', 'Workshop', 'Showcase', 'Career'],
+        'Computer Engineering': ['Technology', 'Workshop', 'Engineering', 'Career'],
+        'Electrical Engineering': ['Engineering', 'Workshop', 'Showcase'],
+        'Mechanical Engineering': ['Engineering', 'Workshop', 'Showcase'],
+        'Biomedical Engineering': ['Engineering', 'Health', 'Workshop'],
+        'Business Administration': ['Business', 'Competition', 'Career', 'Panel'],
+        'Marketing': ['Business', 'Workshop', 'Social', 'Career'],
+        'Biology': ['Health', 'Academic', 'Info Session'],
+        'Psychology': ['Health', 'Academic', 'Panel'],
+        'Communications': ['Social', 'Workshop', 'Panel'],
+        'English': ['Academic', 'Social', 'Workshop'],
+        'Kinesiology': ['Health', 'Social'],
+        'Graphic Design': ['Art', 'Workshop', 'Showcase'],
+        'Environmental Science': ['Academic', 'Workshop'],
+      };
+      const relevantCategories = MAJOR_CATEGORY_MAP[user.major] ?? [];
+      const majorScore = relevantCategories.includes(ev.category) ? 20 : 0;
+
+      const goalKeywords = user.career_goals.flatMap((g) => g.toLowerCase().split(/\s+/));
+      const eventText = `${ev.title} ${ev.description}`.toLowerCase();
+      const goalMatches = goalKeywords.filter((kw) => kw.length > 3 && eventText.includes(kw));
+      const careerScore = Math.min(
+        Math.round((goalMatches.length / Math.max(goalKeywords.length, 1)) * 60),
+        20
+      );
+
+      const eventAttendees = attendingMap[ev.id] ?? [];
+      const allConnections = [...new Set([...matchedIds, ...podMemIds])];
+      const connectionsAttending = eventAttendees.filter((uid) => allConnections.includes(uid));
+      const attendScore = Math.min(connectionsAttending.length * 5, 20);
+
+      const eventDate = new Date(ev.start_time);
+      const dayIndex = eventDate.getUTCDay();
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+      const dayName = dayNames[dayIndex];
+      const hour = eventDate.getUTCHours();
+      let timeSlot: 'morning' | 'afternoon' | 'evening' | 'late_night';
+      if (hour < 12) timeSlot = 'morning';
+      else if (hour < 17) timeSlot = 'afternoon';
+      else if (hour < 21) timeSlot = 'evening';
+      else timeSlot = 'late_night';
+      const availScore = user.availability[dayName]?.[timeSlot] ? 10 : 0;
+
+      if (cancelled) return;
+      setClub(cl ?? undefined);
+      setRsvpStatusState(rsvp);
+      setScore(rec?.score ?? 0);
+      setReasons(rec?.reasons ?? []);
+      setAttendeeInfos(attendeeProfiles);
+      setScoreBreakdown({
+        interest_tag_match: interestScore,
+        major_relevance: majorScore,
+        career_goal_relevance: careerScore,
+        matches_or_pod_attending: attendScore,
+        availability_fit: availScore,
+      });
+      setDataLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, event, refreshKey]);
-
-  // Compute real breakdown using the scoring logic
-  const scoreBreakdown = useMemo(() => {
-    if (!user || !event) return null;
-
-    // Calculate each component individually
-    const userInterests = user.interests.map((i) => i.toLowerCase());
-    const eventTags = event.tags.map((t) => t.toLowerCase());
-    const matchedTags = eventTags.filter((tag) =>
-      userInterests.some(
-        (interest) => interest.includes(tag) || tag.includes(interest)
-      )
-    );
-    const interestScore = Math.min(
-      Math.round((matchedTags.length / Math.max(eventTags.length, 1)) * 30),
-      30
-    );
-
-    const MAJOR_CATEGORY_MAP: Record<string, string[]> = {
-      'Computer Science': ['Technology', 'Workshop', 'Competition', 'Career'],
-      'Software Engineering': ['Technology', 'Workshop', 'Competition', 'Career'],
-      'Data Science': ['Technology', 'Workshop', 'Showcase', 'Career'],
-      'Computer Engineering': ['Technology', 'Workshop', 'Engineering', 'Career'],
-      'Electrical Engineering': ['Engineering', 'Workshop', 'Showcase'],
-      'Mechanical Engineering': ['Engineering', 'Workshop', 'Showcase'],
-      'Biomedical Engineering': ['Engineering', 'Health', 'Workshop'],
-      'Business Administration': ['Business', 'Competition', 'Career', 'Panel'],
-      'Marketing': ['Business', 'Workshop', 'Social', 'Career'],
-      'Biology': ['Health', 'Academic', 'Info Session'],
-      'Psychology': ['Health', 'Academic', 'Panel'],
-      'Communications': ['Social', 'Workshop', 'Panel'],
-      'English': ['Academic', 'Social', 'Workshop'],
-      'Kinesiology': ['Health', 'Social'],
-      'Graphic Design': ['Art', 'Workshop', 'Showcase'],
-      'Environmental Science': ['Academic', 'Workshop'],
-    };
-    const relevantCategories = MAJOR_CATEGORY_MAP[user.major] ?? [];
-    const majorScore = relevantCategories.includes(event.category) ? 20 : 0;
-
-    const goalKeywords = user.career_goals.flatMap((g) => g.toLowerCase().split(/\s+/));
-    const eventText = `${event.title} ${event.description}`.toLowerCase();
-    const goalMatches = goalKeywords.filter((kw) => kw.length > 3 && eventText.includes(kw));
-    const careerScore = Math.min(
-      Math.round((goalMatches.length / Math.max(goalKeywords.length, 1)) * 60),
-      20
-    );
-
-    const attendingMap = getAttendingMap();
-    const eventAttendees = attendingMap[event.id] ?? [];
-    const allConnections = [...new Set([...matchedUserIds, ...podMemberIds])];
-    const connectionsAttending = eventAttendees.filter((uid) => allConnections.includes(uid));
-    const attendScore = Math.min(connectionsAttending.length * 5, 20);
-
-    const eventDate = new Date(event.start_time);
-    const dayIndex = eventDate.getUTCDay();
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
-    const dayName = dayNames[dayIndex];
-    const hour = eventDate.getUTCHours();
-    let timeSlot: 'morning' | 'afternoon' | 'evening' | 'late_night';
-    if (hour < 12) timeSlot = 'morning';
-    else if (hour < 17) timeSlot = 'afternoon';
-    else if (hour < 21) timeSlot = 'evening';
-    else timeSlot = 'late_night';
-    const availScore = user.availability[dayName]?.[timeSlot] ? 10 : 0;
-
-    return {
-      interest_tag_match: interestScore,
-      major_relevance: majorScore,
-      career_goal_relevance: careerScore,
-      matches_or_pod_attending: attendScore,
-      availability_fit: availScore,
-    };
-  }, [user, event, matchedUserIds, podMemberIds]);
+  }, [user, eventId, refreshKey]);
 
   // Generate explanation
   useEffect(() => {
@@ -252,25 +258,25 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     generate();
   }, [user, event]);
 
-  const handleRsvp = (status: RsvpStatus) => {
+  const handleRsvp = async (status: RsvpStatus) => {
     if (!user || !event || isPast) return;
     // Toggle off if already selected
     if (rsvpStatus === status) {
-      removeRsvp(event.id, user.user_id);
+      await removeRsvp(event.id, user.user_id);
     } else {
-      setRsvpStatus(event.id, user.user_id, status);
+      await setRsvpStatus(event.id, user.user_id, status);
     }
     setRefreshKey((k) => k + 1);
   };
 
-  const handleJoinChat = () => {
+  const handleJoinChat = async () => {
     if (!user || !event) return;
-    const conv = getOrCreateEventConversation(event.id, event.title, user.user_id);
+    const conv = await getOrCreateEventConversation(event.id, event.title, user.user_id);
     refreshConversations();
     router.push(`/chat/${conv.id}`);
   };
 
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-2xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />

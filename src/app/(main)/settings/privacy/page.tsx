@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/auth/context';
 import { getBlockedUsers, unblockUser } from '@/lib/data/safety-actions';
+import type { Block } from '@/types/database';
 import { toast } from 'sonner';
 
 export default function PrivacySettingsPage() {
@@ -15,8 +16,18 @@ export default function PrivacySettingsPage() {
   const [isVisible, setIsVisible] = useState(user?.is_visible ?? true);
   const [hideFromMatching, setHideFromMatching] = useState(!user?.is_visible);
   const [availabilityDetail, setAvailabilityDetail] = useState<'full' | 'limited' | 'hidden'>('full');
+  const [blockedUsers, setBlockedUsers] = useState<Block[]>([]);
 
-  const blockedUsers = user ? getBlockedUsers(user.user_id) : [];
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    getBlockedUsers(user.user_id).then((blocks) => {
+      if (!cancelled) setBlockedUsers(blocks);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const handleSave = () => {
     if (!user) return;
@@ -29,9 +40,10 @@ export default function PrivacySettingsPage() {
     toast.success('Privacy settings updated!');
   };
 
-  const handleUnblock = (blockedUserId: string) => {
+  const handleUnblock = async (blockedUserId: string) => {
     if (!user) return;
-    unblockUser(user.user_id, blockedUserId);
+    await unblockUser(user.user_id, blockedUserId);
+    setBlockedUsers((prev) => prev.filter((b) => b.blocked_user_id !== blockedUserId));
     toast.success('User unblocked');
   };
 

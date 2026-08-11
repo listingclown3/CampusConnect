@@ -2,9 +2,10 @@
 
 import type { Pod, Event, Club } from '@/types/database';
 import { notifyStorageChange } from '@/lib/storage-sync';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 // ============================================================
-// Storage keys for user-created items
+// Storage keys for user-created items (mock mode only)
 // ============================================================
 
 const KEYS = {
@@ -17,7 +18,13 @@ const KEYS = {
 // Pods CRUD
 // ============================================================
 
+// Real mode: getAllPods()/getPodById() in data/client.ts already query the
+// live `pods` table, which createPod() below inserts straight into — so
+// there's nothing separate to merge in and this returns [] to avoid
+// double-listing. Mock mode still needs a second store since mock "all
+// pods" is a static seed array, not a live table.
 export function getUserCreatedPods(): Pod[] {
+  if (isSupabaseConfigured()) return [];
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(KEYS.USER_PODS);
@@ -27,7 +34,15 @@ export function getUserCreatedPods(): Pod[] {
   }
 }
 
-export function createPod(pod: Omit<Pod, 'id' | 'created_at' | 'updated_at'>): Pod {
+export async function createPod(pod: Omit<Pod, 'id' | 'created_at' | 'updated_at'>): Promise<Pod> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) throw new Error('Supabase is not configured.');
+    const { data, error } = await client.from('pods').insert(pod).select('*').single();
+    if (error || !data) throw error ?? new Error('Failed to create pod.');
+    return data as Pod;
+  }
+
   const newPod: Pod = {
     ...pod,
     id: `pod-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -42,7 +57,19 @@ export function createPod(pod: Omit<Pod, 'id' | 'created_at' | 'updated_at'>): P
   return newPod;
 }
 
-export function updatePod(podId: string, updates: Partial<Omit<Pod, 'id' | 'created_at'>>): Pod | null {
+export async function updatePod(podId: string, updates: Partial<Omit<Pod, 'id' | 'created_at'>>): Promise<Pod | null> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) return null;
+    const { data } = await client
+      .from('pods')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', podId)
+      .select('*')
+      .maybeSingle();
+    return data as Pod | null;
+  }
+
   const pods = getUserCreatedPods();
   const idx = pods.findIndex((p) => p.id === podId);
   if (idx === -1) return null;
@@ -53,7 +80,14 @@ export function updatePod(podId: string, updates: Partial<Omit<Pod, 'id' | 'crea
   return pods[idx];
 }
 
-export function deletePod(podId: string): boolean {
+export async function deletePod(podId: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) return false;
+    const { error } = await client.from('pods').delete().eq('id', podId);
+    return !error;
+  }
+
   const pods = getUserCreatedPods();
   const filtered = pods.filter((p) => p.id !== podId);
   if (filtered.length === pods.length) return false;
@@ -67,6 +101,7 @@ export function deletePod(podId: string): boolean {
 // ============================================================
 
 export function getUserCreatedEvents(): Event[] {
+  if (isSupabaseConfigured()) return [];
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(KEYS.USER_EVENTS);
@@ -76,7 +111,15 @@ export function getUserCreatedEvents(): Event[] {
   }
 }
 
-export function createEvent(event: Omit<Event, 'id' | 'created_at'>): Event {
+export async function createEvent(event: Omit<Event, 'id' | 'created_at'>): Promise<Event> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) throw new Error('Supabase is not configured.');
+    const { data, error } = await client.from('events').insert(event).select('*').single();
+    if (error || !data) throw error ?? new Error('Failed to create event.');
+    return data as Event;
+  }
+
   const newEvent: Event = {
     ...event,
     id: `evt-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -90,7 +133,14 @@ export function createEvent(event: Omit<Event, 'id' | 'created_at'>): Event {
   return newEvent;
 }
 
-export function updateEvent(eventId: string, updates: Partial<Omit<Event, 'id' | 'created_at'>>): Event | null {
+export async function updateEvent(eventId: string, updates: Partial<Omit<Event, 'id' | 'created_at'>>): Promise<Event | null> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) return null;
+    const { data } = await client.from('events').update(updates).eq('id', eventId).select('*').maybeSingle();
+    return data as Event | null;
+  }
+
   const events = getUserCreatedEvents();
   const idx = events.findIndex((e) => e.id === eventId);
   if (idx === -1) return null;
@@ -101,7 +151,14 @@ export function updateEvent(eventId: string, updates: Partial<Omit<Event, 'id' |
   return events[idx];
 }
 
-export function deleteEvent(eventId: string): boolean {
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) return false;
+    const { error } = await client.from('events').delete().eq('id', eventId);
+    return !error;
+  }
+
   const events = getUserCreatedEvents();
   const filtered = events.filter((e) => e.id !== eventId);
   if (filtered.length === events.length) return false;
@@ -115,6 +172,7 @@ export function deleteEvent(eventId: string): boolean {
 // ============================================================
 
 export function getUserCreatedClubs(): Club[] {
+  if (isSupabaseConfigured()) return [];
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(KEYS.USER_CLUBS);
@@ -124,7 +182,15 @@ export function getUserCreatedClubs(): Club[] {
   }
 }
 
-export function createClub(club: Omit<Club, 'id' | 'created_at'>): Club {
+export async function createClub(club: Omit<Club, 'id' | 'created_at'>): Promise<Club> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) throw new Error('Supabase is not configured.');
+    const { data, error } = await client.from('clubs').insert(club).select('*').single();
+    if (error || !data) throw error ?? new Error('Failed to create club.');
+    return data as Club;
+  }
+
   const newClub: Club = {
     ...club,
     id: `club-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -138,7 +204,14 @@ export function createClub(club: Omit<Club, 'id' | 'created_at'>): Club {
   return newClub;
 }
 
-export function updateClub(clubId: string, updates: Partial<Omit<Club, 'id' | 'created_at'>>): Club | null {
+export async function updateClub(clubId: string, updates: Partial<Omit<Club, 'id' | 'created_at'>>): Promise<Club | null> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) return null;
+    const { data } = await client.from('clubs').update(updates).eq('id', clubId).select('*').maybeSingle();
+    return data as Club | null;
+  }
+
   const clubs = getUserCreatedClubs();
   const idx = clubs.findIndex((c) => c.id === clubId);
   if (idx === -1) return null;
@@ -149,7 +222,14 @@ export function updateClub(clubId: string, updates: Partial<Omit<Club, 'id' | 'c
   return clubs[idx];
 }
 
-export function deleteClub(clubId: string): boolean {
+export async function deleteClub(clubId: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    const client = createClient();
+    if (!client) return false;
+    const { error } = await client.from('clubs').delete().eq('id', clubId);
+    return !error;
+  }
+
   const clubs = getUserCreatedClubs();
   const filtered = clubs.filter((c) => c.id !== clubId);
   if (filtered.length === clubs.length) return false;

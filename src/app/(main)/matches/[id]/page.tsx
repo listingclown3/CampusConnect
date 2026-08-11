@@ -1,13 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/context';
-import {
-  getStudentById,
-  getStudentClassIds,
-  getClassesByIds,
-} from '@/lib/mock-data';
+import { getProfileByUserId, getUserClassIds, getClassesByIds } from '@/lib/data/client';
 import { calculateMatchScore } from '@/lib/matching/score';
 import { getAvailabilityOverlap } from '@/lib/matching/availability';
 import { generateMatchExplanation, generateConversationStarter } from '@/lib/ai';
@@ -29,8 +25,8 @@ import {
   Sparkles,
   UserX,
 } from 'lucide-react';
+import type { Class, MatchResult, Profile } from '@/types/database';
 import { saveMatch, unsaveMatch, isMatchSaved } from '@/lib/data/match-actions';
-import { subscribeToStorage } from '@/lib/storage-sync';
 
 export default function MatchDetailPage() {
   const params = useParams();
@@ -42,31 +38,47 @@ export default function MatchDetailPage() {
   const [starterMessage, setStarterMessage] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
 
-  const matchedStudent = useMemo(() => {
-    return getStudentById(matchId) || null;
-  }, [matchId]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [matchedStudent, setMatchedStudent] = useState<Profile | null>(null);
+  const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
+  const [sharedClasses, setSharedClasses] = useState<Class[]>([]);
+  const [saved, setSaved] = useState(false);
 
-  // Saved state, kept in sync with storage
-  const getSavedSnapshot = useCallback(
-    () => (matchedStudent ? isMatchSaved(matchedStudent.user_id) : false),
-    [matchedStudent]
-  );
-  const saved = useSyncExternalStore(subscribeToStorage, getSavedSnapshot, getSavedSnapshot);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-  const matchResult = useMemo(() => {
-    if (!user || !matchedStudent) return null;
-    const currentUserClasses = getStudentClassIds(user.user_id);
-    const studentClasses = getStudentClassIds(matchedStudent.user_id);
-    return calculateMatchScore(user, matchedStudent, currentUserClasses, studentClasses);
-  }, [user, matchedStudent]);
+    (async () => {
+      setDataLoading(true);
+      const [student, currentUserClasses, isSaved] = await Promise.all([
+        getProfileByUserId(matchId),
+        getUserClassIds(user.user_id),
+        isMatchSaved(matchId),
+      ]);
+      if (cancelled) return;
 
-  const sharedClasses = useMemo(() => {
-    if (!user || !matchedStudent) return [];
-    const currentUserClasses = getStudentClassIds(user.user_id);
-    const studentClasses = getStudentClassIds(matchedStudent.user_id);
-    const sharedIds = currentUserClasses.filter((id) => studentClasses.includes(id));
-    return getClassesByIds(sharedIds);
-  }, [user, matchedStudent]);
+      setMatchedStudent(student);
+      setSaved(isSaved);
+
+      if (student) {
+        const studentClasses = await getUserClassIds(student.user_id);
+        if (cancelled) return;
+        const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
+        setMatchResult(result);
+
+        const sharedIds = currentUserClasses.filter((id) => studentClasses.includes(id));
+        const classes = await getClassesByIds(sharedIds);
+        if (cancelled) return;
+        setSharedClasses(classes);
+      }
+
+      setDataLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, matchId]);
 
   const sharedInterests = useMemo(() => {
     if (!user || !matchedStudent) return [];
@@ -108,21 +120,23 @@ export default function MatchDetailPage() {
     generate();
   }, [user, matchedStudent, matchResult, sharedClasses]);
 
-  const handleToggleSave = () => {
+  const handleToggleSave = useCallback(() => {
     if (!matchedStudent) return;
     if (saved) {
-      unsaveMatch(matchedStudent.user_id);
+      setSaved(false);
+      void unsaveMatch(matchedStudent.user_id);
     } else {
-      saveMatch(matchedStudent.user_id);
+      setSaved(true);
+      void saveMatch(matchedStudent.user_id);
     }
-  };
+  }, [matchedStudent, saved]);
 
   const handleStartChat = () => {
     if (!matchedStudent) return;
     router.push(`/chat?user=${matchedStudent.user_id}`);
   };
 
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-2xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />

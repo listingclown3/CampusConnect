@@ -200,6 +200,7 @@ export interface Club {
   member_count: number;
   image_url: string | null;
   is_active: boolean;
+  created_by: string | null;
   created_at: string;
 }
 

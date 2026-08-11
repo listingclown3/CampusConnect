@@ -1,41 +1,53 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
-/**
- * Proxy placeholder - intentionally a no-op in the current architecture.
- *
- * Why this exists:
- * When Supabase authentication is configured, this proxy will be extended
- * to verify the session cookie on each request and redirect unauthenticated
- * users to /login server-side (before any client JS runs).
- *
- * Current behavior:
- * All requests pass through unchanged. Route protection is handled entirely
- * client-side by the (main)/layout.tsx AuthProvider, which redirects
- * unauthenticated users via router.push('/login'). This means there is a
- * brief "null render" while the client-side check runs - acceptable for a
- * demo/MVP but should be replaced with proper cookie-based session validation
- * before production use.
- *
- * Future implementation would:
- * 1. Read the Supabase auth cookie from the request
- * 2. Verify the JWT server-side
- * 3. Redirect to /login if invalid/missing (for protected routes)
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function proxy(request: NextRequest) {
-  return NextResponse.next();
+// Named `proxy.ts` (not `middleware.ts`) — this Next.js version renamed the
+// convention. Refreshes the Supabase auth session cookie on every request so
+// server components always see a valid session.
+export async function proxy(request: NextRequest) {
+  // Supabase's email-link redirect falls back to the project's bare Site
+  // URL (dropping any path) whenever the intended emailRedirectTo isn't on
+  // the Redirect URLs allow-list, or an old email predates a config change.
+  // Rather than depend on getting that dashboard config exactly right,
+  // forward a stray auth code landing on `/` to the real callback route.
+  if (request.nextUrl.pathname === '/' && request.nextUrl.searchParams.has('code')) {
+    const callbackUrl = new URL('/auth/callback', request.url);
+    callbackUrl.search = request.nextUrl.search;
+    return NextResponse.redirect(callbackUrl);
+  }
+
+  let response = NextResponse.next({ request });
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return response;
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
+
+  // Touch the session so @supabase/ssr can refresh an expiring token.
+  await supabase.auth.getUser();
+
+  return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/|images/|sw.js).*)',
   ],
 };

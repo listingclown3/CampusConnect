@@ -1,17 +1,17 @@
 'use client';
 
-import { useMemo, useState, use } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/context';
-import { getClubById, getEvents } from '@/lib/mock-data';
+import { getClubById, getAllEvents } from '@/lib/data/client';
 import {
   isUserInClub,
   joinClub,
   leaveClub,
   getClubMemberCount,
+  getRsvpStatus,
 } from '@/lib/data/event-actions';
 import { EventCard } from '@/components/events/event-card';
-import { getRsvpStatus } from '@/lib/data/event-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,48 +28,74 @@ import {
   Globe,
 } from 'lucide-react';
 import { CalendarExportButton } from '@/components/calendar/calendar-export-button';
+import type { Club, Event, RsvpStatus } from '@/types/database';
 
 export default function ClubDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: clubId } = use(params);
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  const club = useMemo(() => getClubById(clubId), [clubId]);
+  const [club, setClub] = useState<Club | null>(null);
+  const [isMember, setIsMember] = useState(false);
+  const [memberCount, setMemberCount] = useState(0);
+  const [clubEvents, setClubEvents] = useState<Event[]>([]);
+  const [rsvpByEvent, setRsvpByEvent] = useState<Record<string, RsvpStatus | null>>({});
 
-  const isMember = useMemo(() => {
-    if (!user || !club) return false;
-    return isUserInClub(club.id, user.user_id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, club, refreshKey]);
+  useEffect(() => {
+    let cancelled = false;
 
-  const memberCount = useMemo(() => {
-    if (!club) return 0;
-    return getClubMemberCount(club.id, club.member_count);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [club, refreshKey]);
+    (async () => {
+      setDataLoading(true);
+      const c = await getClubById(clubId);
+      if (cancelled) return;
+      setClub(c);
 
-  const clubEvents = useMemo(() => {
-    if (!club) return [];
-    const events = getEvents();
-    return events
-      .filter((e) => e.club_id === club.id)
-      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  }, [club]);
+      if (!c) {
+        setDataLoading(false);
+        return;
+      }
 
-  const handleJoin = () => {
+      const allEvents = await getAllEvents();
+      const events = allEvents
+        .filter((e) => e.club_id === c.id)
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      const [member, count, rsvpEntries] = await Promise.all([
+        user ? isUserInClub(c.id, user.user_id) : Promise.resolve(false),
+        getClubMemberCount(c.id, c.member_count),
+        user
+          ? Promise.all(events.map(async (e) => [e.id, await getRsvpStatus(e.id, user.user_id)] as const))
+          : Promise.resolve([]),
+      ]);
+      if (cancelled) return;
+
+      setClubEvents(events);
+      setIsMember(member);
+      setMemberCount(count);
+      setRsvpByEvent(Object.fromEntries(rsvpEntries));
+      setDataLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clubId, user, refreshKey]);
+
+  const handleJoin = async () => {
     if (!user || !club) return;
-    joinClub(club.id, user.user_id);
+    await joinClub(club.id, user.user_id);
     setRefreshKey((k) => k + 1);
   };
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
     if (!user || !club) return;
-    leaveClub(club.id, user.user_id);
+    await leaveClub(club.id, user.user_id);
     setRefreshKey((k) => k + 1);
   };
 
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-2xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -212,7 +238,7 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
             <div className="grid gap-3">
               {clubEvents.map((event) => {
                 const isPast = new Date(event.start_time) < new Date();
-                const rsvpStatus = user ? getRsvpStatus(event.id, user.user_id) : null;
+                const rsvpStatus = rsvpByEvent[event.id] ?? null;
                 return (
                   <EventCard
                     key={event.id}

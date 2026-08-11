@@ -27,14 +27,14 @@ export function CreatePodDialog({ onCreated }: CreatePodDialogProps) {
   const [maxMembers, setMaxMembers] = useState(5);
   const [tags, setTags] = useState('');
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!user) return;
     if (!name.trim()) {
       toast.error('Please enter a pod name');
       return;
     }
 
-    const newPod = createPod({
+    const newPod = await createPod({
       name: name.trim(),
       description: description.trim() || null,
       pod_type: podType,
@@ -47,7 +47,7 @@ export function CreatePodDialog({ onCreated }: CreatePodDialogProps) {
     });
 
     // Auto-join the creator
-    joinPod(newPod.id, user.user_id);
+    await joinPod(newPod.id, user.user_id);
 
     toast.success(`Pod "${name}" created! You've been added as a member.`);
     setOpen(false);

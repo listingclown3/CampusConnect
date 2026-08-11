@@ -688,7 +688,7 @@ export const mockStudents: Profile[] = [
     "id": "user-009",
     "first_name": "Maya",
     "last_name": "Johnson",
-    "major": "Biology",
+    "major": "Biological Sciences",
     "student_type": "freshman",
     "interests": [
       "pre-med",
@@ -860,7 +860,7 @@ export const mockStudents: Profile[] = [
     "id": "user-011",
     "first_name": "Rachel",
     "last_name": "Lee",
-    "major": "Communications",
+    "major": "Communication Studies",
     "student_type": "freshman",
     "interests": [
       "social media",
@@ -1718,7 +1718,7 @@ export const mockStudents: Profile[] = [
     "id": "user-021",
     "first_name": "Isabella",
     "last_name": "Moreno",
-    "major": "Environmental Science",
+    "major": "Environmental Studies",
     "student_type": "freshman",
     "interests": [
       "sustainability",
@@ -1890,7 +1890,7 @@ export const mockStudents: Profile[] = [
     "id": "user-023",
     "first_name": "Olivia",
     "last_name": "Adams",
-    "major": "Marketing",
+    "major": "Business Administration",
     "student_type": "transfer",
     "interests": [
       "digital marketing",

@@ -6,8 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
-  useMemo,
-  useSyncExternalStore,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { Conversation, Message, ConversationMember } from '@/types/database';
@@ -17,23 +16,19 @@ import {
   getConversationMessages,
   getConversationMembersList,
   getConversationById,
+  getMembersForConversations,
+  getMessagesForConversations,
+  getDisplayNamesForUsers,
+  getOtherUserInDirectFromMembers,
   sendMessage as sendMessageToStore,
   createDirectConversation,
   leaveConversation as leaveConversationFromStore,
   markConversationRead,
-  getUnreadCount,
-  getLastMessage,
-  isUserMember,
-  isBlocked,
+  getBlocks,
+  addBlock,
   subscribeToConversation,
   unsubscribeFromConversation,
 } from './realtime';
-import { subscribeToStorage, notifyStorageChange, createStorageSnapshot } from '@/lib/storage-sync';
-
-const EMPTY_CONVERSATIONS: Conversation[] = [];
-function getServerConversationsSnapshot(): Conversation[] {
-  return EMPTY_CONVERSATIONS;
-}
 
 // ============================================================
 // Types
@@ -50,12 +45,20 @@ export interface ChatContextType {
   refreshConversations: () => void;
   setActiveConversation: (conversationId: string | null) => void;
   sendMessage: (content: string) => void;
-  createOrFindDirectChat: (otherUserId: string) => Conversation;
+  createOrFindDirectChat: (otherUserId: string) => Promise<Conversation>;
   leaveConversation: (conversationId: string) => void;
   getUnreadForConversation: (conversationId: string) => number;
   getLastMessageForConversation: (conversationId: string) => Message | null;
   canAccessConversation: (conversationId: string) => boolean;
   isUserBlocked: (otherUserId: string) => boolean;
+  blockUser: (otherUserId: string) => void;
+  /** The other participant's id in a direct conversation, from the preloaded
+   * member cache — synchronous so list/detail views can render without a
+   * per-row fetch. */
+  getOtherUserId: (conversationId: string) => string | null;
+  /** Display name from the preloaded profile-name cache. Empty string until
+   * the batch fetch resolves (first render tick). */
+  getDisplayName: (userId: string) => string;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -65,35 +68,79 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 // ============================================================
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { userId } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [membersByConversation, setMembersByConversation] = useState<Record<string, ConversationMember[]>>({});
+  const [lastMessageByConversation, setLastMessageByConversation] = useState<Record<string, Message | null>>({});
+  const [unreadByConversation, setUnreadByConversation] = useState<Record<string, number>>({});
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+
   const [activeConversation, setActiveConversationState] = useState<Conversation | null>(null);
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [activeMembers, setActiveMembers] = useState<ConversationMember[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const userId = user?.user_id || '';
-  const isLoading = !userId;
+  const activeConversationIdRef = useRef<string | null>(null);
 
-  // Load conversations from the mock store, kept in sync as it changes
-  const getConversationsSnapshot = useMemo(
-    () => createStorageSnapshot(() => (userId ? getUserConversations(userId) : EMPTY_CONVERSATIONS)),
-    [userId]
-  );
-  const conversations = useSyncExternalStore(
-    subscribeToStorage,
-    getConversationsSnapshot,
-    getServerConversationsSnapshot
-  );
+  const refreshConversations = useCallback(async () => {
+    if (!userId) {
+      setConversations([]);
+      setMembersByConversation({});
+      setLastMessageByConversation({});
+      setUnreadByConversation({});
+      return;
+    }
 
-  // Kept for callers that mutate conversations through paths not already
-  // wired to notifyStorageChange() (e.g. via storage.ts's setters).
-  const refreshConversations = useCallback(() => {
-    notifyStorageChange();
-  }, []);
+    const convos = await getUserConversations(userId);
+    setConversations(convos);
+    const convIds = convos.map((c) => c.id);
 
-  // Set active conversation
+    const [members, messages, blocks] = await Promise.all([
+      getMembersForConversations(convIds),
+      getMessagesForConversations(convIds),
+      getBlocks(userId),
+    ]);
+
+    const membersMap: Record<string, ConversationMember[]> = {};
+    for (const m of members) {
+      (membersMap[m.conversation_id] ??= []).push(m);
+    }
+    setMembersByConversation(membersMap);
+    setBlockedIds(new Set(blocks.map((b) => b.blocked_user_id)));
+
+    const lastMsgMap: Record<string, Message | null> = {};
+    const unreadMap: Record<string, number> = {};
+    for (const convId of convIds) {
+      const convMessages = messages.filter((m) => m.conversation_id === convId);
+      lastMsgMap[convId] = convMessages.length > 0 ? convMessages[convMessages.length - 1] : null;
+      const myMembership = membersMap[convId]?.find((m) => m.user_id === userId);
+      const lastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+      unreadMap[convId] = convMessages.filter(
+        (m) => m.sender_id !== userId && new Date(m.created_at).getTime() > lastRead
+      ).length;
+    }
+    setLastMessageByConversation(lastMsgMap);
+    setUnreadByConversation(unreadMap);
+
+    const userIds = members.map((m) => m.user_id);
+    const names = await getDisplayNamesForUsers(userIds);
+    setDisplayNames((prev) => ({ ...prev, ...names }));
+  }, [userId]);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      await refreshConversations();
+      setIsLoading(false);
+    };
+    load();
+  }, [refreshConversations]);
+
   const setActiveConversation = useCallback(
     (conversationId: string | null) => {
+      activeConversationIdRef.current = conversationId;
       if (!conversationId) {
         setActiveConversationState(null);
         setActiveMessages([]);
@@ -101,28 +148,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const conv = getConversationById(conversationId);
-      setActiveConversationState(conv);
+      (async () => {
+        const [conv, messages, members] = await Promise.all([
+          getConversationById(conversationId),
+          getConversationMessages(conversationId),
+          getConversationMembersList(conversationId),
+        ]);
+        // Bail if the user navigated away before this resolved.
+        if (activeConversationIdRef.current !== conversationId) return;
 
-      if (conv) {
-        const messages = getConversationMessages(conversationId);
+        setActiveConversationState(conv);
         setActiveMessages(messages);
-        const members = getConversationMembersList(conversationId);
         setActiveMembers(members);
-        // Mark as read
+        setMembersByConversation((prev) => ({ ...prev, [conversationId]: members }));
+
+        const names = await getDisplayNamesForUsers(members.map((m) => m.user_id));
+        setDisplayNames((prev) => ({ ...prev, ...names }));
+
         if (userId) {
-          markConversationRead(conversationId, userId);
+          await markConversationRead(conversationId, userId);
+          setUnreadByConversation((prev) => ({ ...prev, [conversationId]: 0 }));
         }
-        // Subscribe to real-time updates
+
         subscribeToConversation(conversationId, (newMessage) => {
           setActiveMessages((prev) => [...prev, newMessage]);
         });
-      }
+      })();
     },
     [userId]
   );
 
-  // Unsubscribe when active conversation changes
   useEffect(() => {
     return () => {
       if (activeConversation) {
@@ -131,93 +186,95 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
   }, [activeConversation]);
 
-  // Send message
   const sendMessage = useCallback(
     (content: string) => {
       if (!activeConversation || !userId || !content.trim()) return;
 
       setIsSending(true);
-      try {
-        const newMessage = sendMessageToStore(
-          activeConversation.id,
-          userId,
-          content.trim()
-        );
-        // Optimistic update
-        setActiveMessages((prev) => [...prev, newMessage]);
-        // Refresh conversations to update order
-        refreshConversations();
-      } finally {
-        setIsSending(false);
-      }
+      (async () => {
+        try {
+          const newMessage = await sendMessageToStore(activeConversation.id, userId, content.trim());
+          setActiveMessages((prev) => [...prev, newMessage]);
+          await refreshConversations();
+        } finally {
+          setIsSending(false);
+        }
+      })();
     },
     [activeConversation, userId, refreshConversations]
   );
 
-  // Create or find direct chat
   const createOrFindDirectChat = useCallback(
-    (otherUserId: string): Conversation => {
-      const conv = createDirectConversation(userId, otherUserId);
-      refreshConversations();
+    async (otherUserId: string): Promise<Conversation> => {
+      const conv = await createDirectConversation(userId!, otherUserId);
+      await refreshConversations();
       return conv;
     },
     [userId, refreshConversations]
   );
 
-  // Leave conversation
   const leaveConversation = useCallback(
     (conversationId: string) => {
-      leaveConversationFromStore(conversationId, userId);
-      if (activeConversation?.id === conversationId) {
-        setActiveConversationState(null);
-        setActiveMessages([]);
-        setActiveMembers([]);
-      }
-      refreshConversations();
+      if (!userId) return;
+      (async () => {
+        await leaveConversationFromStore(conversationId, userId);
+        if (activeConversation?.id === conversationId) {
+          setActiveConversationState(null);
+          setActiveMessages([]);
+          setActiveMembers([]);
+        }
+        await refreshConversations();
+      })();
     },
     [userId, activeConversation, refreshConversations]
   );
 
-  // Unread count for a conversation
   const getUnreadForConversation = useCallback(
-    (conversationId: string): number => {
-      if (!userId) return 0;
-      return getUnreadCount(conversationId, userId);
-    },
-    [userId]
+    (conversationId: string): number => unreadByConversation[conversationId] ?? 0,
+    [unreadByConversation]
   );
 
-  // Last message for a conversation
   const getLastMessageForConversation = useCallback(
-    (conversationId: string): Message | null => {
-      return getLastMessage(conversationId);
-    },
-    []
+    (conversationId: string): Message | null => lastMessageByConversation[conversationId] ?? null,
+    [lastMessageByConversation]
   );
 
-  // Access check
+  // RLS already scopes getUserConversations() to the caller's own
+  // memberships, so "loaded into `conversations`" is exactly "has access".
   const canAccessConversation = useCallback(
-    (conversationId: string): boolean => {
-      if (!userId) return false;
-      return isUserMember(conversationId, userId);
-    },
-    [userId]
+    (conversationId: string): boolean => conversations.some((c) => c.id === conversationId),
+    [conversations]
   );
 
-  // Block check
   const isUserBlocked = useCallback(
-    (otherUserId: string): boolean => {
-      if (!userId) return false;
-      return isBlocked(userId, otherUserId);
+    (otherUserId: string): boolean => blockedIds.has(otherUserId),
+    [blockedIds]
+  );
+
+  const blockUser = useCallback(
+    (otherUserId: string) => {
+      if (!userId) return;
+      setBlockedIds((prev) => new Set(prev).add(otherUserId));
+      addBlock(userId, otherUserId);
     },
     [userId]
   );
 
-  // Total unread
-  const totalUnread = conversations.reduce(
-    (sum, conv) => sum + getUnreadForConversation(conv.id),
-    0
+  const getOtherUserId = useCallback(
+    (conversationId: string): string | null => {
+      if (!userId) return null;
+      const members = membersByConversation[conversationId] ?? [];
+      return getOtherUserInDirectFromMembers(members, userId);
+    },
+    [membersByConversation, userId]
   );
+
+  const getDisplayName = useCallback(
+    (userIdToLookUp: string): string => displayNames[userIdToLookUp] ?? '',
+    [displayNames]
+  );
+
+  const totalUnread = conversations.reduce((sum, conv) => sum + getUnreadForConversation(conv.id), 0);
 
   return (
     <ChatContext.Provider
@@ -229,7 +286,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         isSending,
         isLoading,
         totalUnread,
-        refreshConversations,
+        refreshConversations: () => {
+          refreshConversations();
+        },
         setActiveConversation,
         sendMessage,
         createOrFindDirectChat,
@@ -238,6 +297,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         getLastMessageForConversation,
         canAccessConversation,
         isUserBlocked,
+        blockUser,
+        getOtherUserId,
+        getDisplayName,
       }}
     >
       {children}

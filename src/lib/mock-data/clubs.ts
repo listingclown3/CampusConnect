@@ -18,6 +18,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_aiclub",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -39,6 +40,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_datascienceclub",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -59,6 +61,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_softwareengineeringsociety",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -80,6 +83,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_entrepreneurshipclub",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -102,6 +106,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_uxdesignclub",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -123,6 +128,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_premedsociety",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -143,6 +149,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_gamingclub",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -164,6 +171,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_spartanracing",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -185,6 +193,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_womeninbusiness",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   },
@@ -206,6 +215,7 @@ export const mockClubs: Club[] = [
     "website_url": null,
     "instagram_handle": "@sjsu_animationclub",
     "image_url": null,
+    "created_by": null,
     "is_active": true,
     "created_at": "2024-06-01T00:00:00Z"
   }

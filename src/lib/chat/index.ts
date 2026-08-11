@@ -12,7 +12,6 @@ export {
   getUnreadCount,
   getLastMessage,
   isUserMember,
-  isBlocked,
   addBlock,
   getBlocks,
   getOtherUserInDirect,

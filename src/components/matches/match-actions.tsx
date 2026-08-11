@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Eye, Bookmark, X, MessageCircle } from 'lucide-react';
@@ -20,7 +20,17 @@ interface MatchActionsProps {
 
 export function MatchActions({ userId, onSkip, className }: MatchActionsProps) {
   const router = useRouter();
-  const [saved, setSaved] = useState(() => isMatchSaved(userId));
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    isMatchSaved(userId).then((result) => {
+      if (!cancelled) setSaved(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const handleView = () => {
     router.push(`/matches/${userId}`);
@@ -28,16 +38,16 @@ export function MatchActions({ userId, onSkip, className }: MatchActionsProps) {
 
   const handleSave = () => {
     if (saved) {
-      unsaveMatch(userId);
+      void unsaveMatch(userId);
       setSaved(false);
     } else {
-      saveMatch(userId);
+      void saveMatch(userId);
       setSaved(true);
     }
   };
 
   const handleSkip = () => {
-    skipMatch(userId);
+    void skipMatch(userId);
     onSkip?.();
   };
 

@@ -1,13 +1,8 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/context';
-import {
-  getPods,
-  getStudents,
-  getStudentClassIds,
-  getClassesByIds,
-} from '@/lib/mock-data';
+import { getAllPods, getProfileByUserId, getUserClassIds, getClassesByIds } from '@/lib/data/client';
 import { findBestMeetingTime } from '@/lib/matching/availability';
 import { scorePodForUser } from '@/lib/data/pod-scoring';
 import {
@@ -24,8 +19,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UsersRound, Layers, Search, X, Sparkles, BookOpen, Briefcase, Heart, CalendarDays } from 'lucide-react';
-import type { PodType, Profile } from '@/types/database';
+import type { DayOfWeek, Pod, PodType, Profile, TimeSlot } from '@/types/database';
 import { cn } from '@/lib/utils';
+
+interface PodEntry {
+  pod: Pod;
+  memberProfiles: Profile[];
+  score: number;
+  sharedGoal: string | undefined;
+  meetingTime: { day: DayOfWeek; slot: TimeSlot }[];
+  isMember: boolean;
+  isFull: boolean;
+  memberCount: number;
+}
 
 const FILTER_OPTIONS: { label: string; value: PodType | 'all' | 'my_pods'; icon?: React.ReactNode }[] = [
   { label: 'All Pods', value: 'all' },
@@ -42,69 +48,87 @@ export default function PodsPage() {
   const [filter, setFilter] = useState<PodType | 'all' | 'my_pods'>('all');
   const [search, setSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [podsData, setPodsData] = useState<PodEntry[]>([]);
+  const [podsDataLoading, setPodsDataLoading] = useState(true);
 
-  const podsData = useMemo(() => {
-    if (!user) return [];
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-    const mockPods = getPods();
-    const userCreatedPods = getUserCreatedPods();
-    const pods = [...mockPods, ...userCreatedPods];
-    const students = getStudents();
-    const userClassIds = getStudentClassIds(user.user_id);
-    const userClasses = getClassesByIds(userClassIds);
+    (async () => {
+      setPodsDataLoading(true);
+      const [allPods, userCreatedPods, userClassIds] = await Promise.all([
+        getAllPods(),
+        Promise.resolve(getUserCreatedPods()),
+        getUserClassIds(user.user_id),
+      ]);
+      const pods = [...allPods, ...userCreatedPods];
+      const userClasses = await getClassesByIds(userClassIds);
+      if (cancelled) return;
 
-    return pods.map((pod) => {
-      const podMembers = getPodMembersForPod(pod.id);
-      const memberProfiles: Profile[] = podMembers
-        .map((pm) => students.find((s) => s.user_id === pm.user_id))
-        .filter((p): p is Profile => p !== null && p !== undefined);
+      const entries = await Promise.all(
+        pods.map(async (pod) => {
+          const podMembers = await getPodMembersForPod(pod.id);
+          const memberProfiles = (
+            await Promise.all(podMembers.map((pm) => getProfileByUserId(pm.user_id)))
+          ).filter((p): p is Profile => p !== null);
 
-      const score = scorePodForUser(user, memberProfiles, pod);
+          const score = scorePodForUser(user, memberProfiles, pod);
 
-      let sharedGoal: string | undefined;
-      if (pod.class_id) {
-        const cls = userClasses.find((c) => c.id === pod.class_id);
-        if (cls) {
-          sharedGoal = `Shared: ${cls.course_code}`;
-        } else {
-          const allClasses = getClassesByIds([pod.class_id]);
-          if (allClasses.length > 0) {
-            sharedGoal = `Class: ${allClasses[0].course_code}`;
+          let sharedGoal: string | undefined;
+          if (pod.class_id) {
+            const cls = userClasses.find((c) => c.id === pod.class_id);
+            if (cls) {
+              sharedGoal = `Shared: ${cls.course_code}`;
+            } else {
+              const allClasses = await getClassesByIds([pod.class_id]);
+              if (allClasses.length > 0) {
+                sharedGoal = `Class: ${allClasses[0].course_code}`;
+              }
+            }
           }
-        }
-      }
-      if (!sharedGoal && pod.tags.length > 0) {
-        const matchingTags = pod.tags.filter((t) =>
-          user.interests.some((i) => i.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(i.toLowerCase()))
-        );
-        if (matchingTags.length > 0) {
-          sharedGoal = `Shared interest: ${matchingTags[0]}`;
-        } else {
-          sharedGoal = pod.tags[0];
-        }
-      }
+          if (!sharedGoal && pod.tags.length > 0) {
+            const matchingTags = pod.tags.filter((t) =>
+              user.interests.some((i) => i.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(i.toLowerCase()))
+            );
+            if (matchingTags.length > 0) {
+              sharedGoal = `Shared interest: ${matchingTags[0]}`;
+            } else {
+              sharedGoal = pod.tags[0];
+            }
+          }
 
-      let meetingTime: { day: import('@/types/database').DayOfWeek; slot: import('@/types/database').TimeSlot }[] = [];
-      if (memberProfiles.length > 0) {
-        meetingTime = findBestMeetingTime(user.availability, memberProfiles[0].availability, 2);
+          let meetingTime: { day: DayOfWeek; slot: TimeSlot }[] = [];
+          if (memberProfiles.length > 0) {
+            meetingTime = findBestMeetingTime(user.availability, memberProfiles[0].availability, 2);
+          }
+
+          const isMember = await isUserInPod(pod.id, user.user_id);
+          const memberCount = await getPodMemberCount(pod.id);
+          const isFull = memberCount >= pod.max_members;
+
+          return {
+            pod,
+            memberProfiles,
+            score,
+            sharedGoal,
+            meetingTime,
+            isMember,
+            isFull,
+            memberCount,
+          };
+        })
+      );
+
+      if (!cancelled) {
+        setPodsData(entries);
+        setPodsDataLoading(false);
       }
+    })();
 
-      const isMember = isUserInPod(pod.id, user.user_id);
-      const memberCount = getPodMemberCount(pod.id);
-      const isFull = memberCount >= pod.max_members;
-
-      return {
-        pod,
-        memberProfiles,
-        score,
-        sharedGoal,
-        meetingTime,
-        isMember,
-        isFull,
-        memberCount,
-      };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
   }, [user, refreshKey]);
 
   const filteredPods = useMemo(() => {
@@ -136,8 +160,10 @@ export default function PodsPage() {
   const handleJoin = useCallback(
     (podId: string) => {
       if (!user) return;
-      joinPod(podId, user.user_id);
-      setRefreshKey((k) => k + 1);
+      (async () => {
+        await joinPod(podId, user.user_id);
+        setRefreshKey((k) => k + 1);
+      })();
     },
     [user]
   );
@@ -146,8 +172,10 @@ export default function PodsPage() {
     (podId: string) => {
       if (!user) return;
       if (window.confirm('Are you sure you want to leave this pod?')) {
-        leavePod(podId, user.user_id);
-        setRefreshKey((k) => k + 1);
+        (async () => {
+          await leavePod(podId, user.user_id);
+          setRefreshKey((k) => k + 1);
+        })();
       }
     },
     [user]
@@ -157,7 +185,7 @@ export default function PodsPage() {
   const myPodsCount = podsData.filter((p) => p.isMember).length;
   const totalPods = podsData.length;
 
-  if (isLoading) {
+  if (isLoading || podsDataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
         <Skeleton className="h-8 w-48" />

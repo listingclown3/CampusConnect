@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/context';
-import { getStudents, getStudentClassIds, getClassesByIds } from '@/lib/mock-data';
+import { getVisibleProfiles, getUserClassIds, getUserClassIdsForUsers } from '@/lib/data/client';
 import { calculateMatchScore } from '@/lib/matching/score';
+import type { Profile } from '@/types/database';
 import { getSkippedMatches, undoSkipMatch } from '@/lib/data/match-actions';
 import { getHiddenUserIds } from '@/lib/data/safety-actions';
 import { MatchCard } from '@/components/matches/match-card';
@@ -32,50 +33,71 @@ const MAJOR_FILTERS = [
   'Environmental Science', 'Kinesiology', 'Marketing', 'Biomedical Engineering',
 ];
 
+interface ScoredMatch {
+  student: Profile;
+  score: number;
+  reasons: string[];
+  sharedClassesCount: number;
+  sharedInterestsCount: number;
+  sharedInterests: string[];
+}
+
 export default function MatchesPage() {
   const { user, isLoading } = useAuth();
-  const [skippedList, setSkippedList] = useState<string[]>(() => getSkippedMatches());
+  const [skippedList, setSkippedList] = useState<string[]>([]);
   const [lastSkipped, setLastSkipped] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('compatibility');
   const [majorFilter, setMajorFilter] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [matches, setMatches] = useState<ScoredMatch[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(true);
 
-  const matches = useMemo(() => {
-    if (!user) return [];
-    const hiddenIds = getHiddenUserIds(user.user_id);
-    const students = getStudents().filter(
-      (s) => s.user_id !== user.user_id && s.is_visible && !hiddenIds.includes(s.user_id)
-    );
-    const currentUserClasses = getStudentClassIds(user.user_id);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-    const scored = students.map((student) => {
-      const studentClasses = getStudentClassIds(student.user_id);
-      const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
+    (async () => {
+      setMatchesLoading(true);
+      const [hiddenIds, visibleProfiles, currentUserClasses, skipped] = await Promise.all([
+        getHiddenUserIds(user.user_id),
+        getVisibleProfiles(user.user_id),
+        getUserClassIds(user.user_id),
+        getSkippedMatches(),
+      ]);
+      if (cancelled) return;
+      setSkippedList(skipped);
+      const students = visibleProfiles.filter((s) => !hiddenIds.includes(s.user_id));
+      const classIdsByUser = await getUserClassIdsForUsers(students.map((s) => s.user_id));
+      if (cancelled) return;
 
-      // Get shared classes info
-      const sharedClassIds = currentUserClasses.filter((id) => studentClasses.includes(id));
-      const sharedClasses = getClassesByIds(sharedClassIds);
+      const scored: ScoredMatch[] = students.map((student) => {
+        const studentClasses = classIdsByUser[student.user_id] ?? [];
+        const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
+        const sharedClassIds = currentUserClasses.filter((id) => studentClasses.includes(id));
+        const sharedInterests = user.interests.filter((i) =>
+          student.interests.some((si) => si.toLowerCase() === i.toLowerCase())
+        );
 
-      // Get shared interests
-      const sharedInterests = user.interests.filter((i) =>
-        student.interests.some((si) => si.toLowerCase() === i.toLowerCase())
-      );
+        return {
+          student,
+          score: result.score,
+          reasons: result.reasons,
+          sharedClassesCount: sharedClassIds.length,
+          sharedInterestsCount: sharedInterests.length,
+          sharedInterests,
+        };
+      });
 
-      return {
-        student,
-        score: result.score,
-        reasons: result.reasons,
-        sharedClassesCount: sharedClasses.length,
-        sharedInterestsCount: sharedInterests.length,
-        sharedInterests,
-      };
-    });
+      scored.sort((a, b) => b.score - a.score);
+      setMatches(scored.filter((m) => m.score > 0));
+      setMatchesLoading(false);
+    })();
 
-    // Sort by score descending, filter out zero-score matches
-    scored.sort((a, b) => b.score - a.score);
-    return scored.filter((m) => m.score > 0);
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   // Apply all filters
@@ -141,8 +163,9 @@ export default function MatchesPage() {
 
   const handleUndo = useCallback(() => {
     if (lastSkipped) {
-      undoSkipMatch(lastSkipped);
-      setSkippedList((prev) => prev.filter((id) => id !== lastSkipped));
+      const id = lastSkipped;
+      void undoSkipMatch(id);
+      setSkippedList((prev) => prev.filter((skippedId) => skippedId !== id));
       setLastSkipped(null);
     }
   }, [lastSkipped]);
@@ -153,7 +176,7 @@ export default function MatchesPage() {
     return Array.from(majors).sort();
   }, [matches]);
 
-  if (isLoading) {
+  if (isLoading || matchesLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
         <Skeleton className="h-8 w-48" />

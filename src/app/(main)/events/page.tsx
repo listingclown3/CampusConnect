@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth/context';
-import { getEvents, getClubById, getStudents, getStudentClassIds } from '@/lib/mock-data';
+import { getAllEvents, getAllClubs, getVisibleProfiles, getUserClassIds, getUserClassIdsForUsers } from '@/lib/data/client';
 import { getUserCreatedEvents } from '@/lib/data/crud-storage';
 import { recommendEvents } from '@/lib/matching/events';
 import { calculateMatchScore } from '@/lib/matching/score';
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Calendar, Search, X, Sparkles, Clock, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { Club, Event, RsvpStatus } from '@/types/database';
 
 type TimeFilter = 'upcoming' | 'past' | 'this_week' | 'this_month';
 type CategoryFilter = string | null;
@@ -24,59 +25,81 @@ export default function EventsPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>(null);
   const [search, setSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  const { recommended, allEvents, categories } = useMemo(() => {
-    if (!user) return { recommended: [], allEvents: [], categories: [] };
+  const [recommended, setRecommended] = useState<ReturnType<typeof recommendEvents>>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [clubsById, setClubsById] = useState<Record<string, Club>>({});
+  const [rsvpByEvent, setRsvpByEvent] = useState<Record<string, RsvpStatus | null>>({});
 
-    const mockEvents = getEvents();
-    const userEvents = getUserCreatedEvents();
-    const events = [...mockEvents, ...userEvents];
-    const students = getStudents();
-    const currentUserClasses = getStudentClassIds(user.user_id);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-    // Build matched user IDs
-    const matchedUserIds = students
-      .filter((s) => s.user_id !== user.user_id)
-      .filter((s) => {
-        const studentClasses = getStudentClassIds(s.user_id);
-        const result = calculateMatchScore(user, s, currentUserClasses, studentClasses);
-        return result.score >= 50;
-      })
-      .map((s) => s.user_id);
+    (async () => {
+      setDataLoading(true);
+      const mockEvents = await getAllEvents();
+      const userEvents = await getUserCreatedEvents();
+      const events = [...mockEvents, ...userEvents];
+      const clubs = await getAllClubs();
+      const students = await getVisibleProfiles(user.user_id);
+      const currentUserClasses = await getUserClassIds(user.user_id);
+      const classIdsByUser = await getUserClassIdsForUsers(students.map((s) => s.user_id));
+      if (cancelled) return;
 
-    // Get pod member user IDs
-    const userPodIds = getUserPodIds(user.user_id);
-    const podMemberIds = new Set<string>();
-    for (const podId of userPodIds) {
-      const members = getPodMembersForPod(podId);
-      for (const m of members) {
-        if (m.user_id !== user.user_id) podMemberIds.add(m.user_id);
+      // Build matched user IDs
+      const matchedUserIds = students
+        .filter((s) => {
+          const studentClasses = classIdsByUser[s.user_id] ?? [];
+          const result = calculateMatchScore(user, s, currentUserClasses, studentClasses);
+          return result.score >= 50;
+        })
+        .map((s) => s.user_id);
+
+      // Get pod member user IDs
+      const userPodIds = await getUserPodIds(user.user_id);
+      const podMemberIds = new Set<string>();
+      for (const podId of userPodIds) {
+        const members = await getPodMembersForPod(podId);
+        for (const m of members) {
+          if (m.user_id !== user.user_id) podMemberIds.add(m.user_id);
+        }
       }
-    }
 
-    const allConnectionIds = [...new Set([...matchedUserIds, ...podMemberIds])];
-    const attendingMap = getAttendingMap();
+      const allConnectionIds = [...new Set([...matchedUserIds, ...podMemberIds])];
+      const attendingMap = await getAttendingMap();
 
-    const recommendations = recommendEvents(user, events, {
-      attendingMap,
-      matchedUserIds: allConnectionIds,
-      limit: 6,
-    });
+      const recommendations = recommendEvents(user, events, {
+        attendingMap,
+        matchedUserIds: allConnectionIds,
+        limit: 6,
+      });
 
-    // Sort all events chronologically
-    const sortedEvents = [...events].sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    );
+      // Sort all events chronologically
+      const sortedEvents = [...events].sort(
+        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      );
 
-    // Extract categories
-    const cats = [...new Set(events.map((e) => e.category))].sort();
+      // Extract categories
+      const cats = [...new Set(events.map((e) => e.category))].sort();
 
-    return {
-      recommended: recommendations.filter((r) => r.score > 0),
-      allEvents: sortedEvents,
-      categories: cats,
+      const rsvpEntries = await Promise.all(
+        events.map(async (e) => [e.id, await getRsvpStatus(e.id, user.user_id)] as const)
+      );
+      if (cancelled) return;
+
+      setClubsById(Object.fromEntries(clubs.map((c) => [c.id, c])));
+      setRecommended(recommendations.filter((r) => r.score > 0));
+      setAllEvents(sortedEvents);
+      setCategories(cats);
+      setRsvpByEvent(Object.fromEntries(rsvpEntries));
+      setDataLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, refreshKey]);
 
   const now = useMemo(() => new Date(), []);
@@ -132,7 +155,7 @@ export default function EventsPage() {
     return results;
   }, [allEvents, timeFilter, categoryFilter, search, now]);
 
-  if (isLoading) {
+  if (isLoading || dataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -249,9 +272,9 @@ export default function EventsPage() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {recommended.slice(0, 6).map((rec) => {
-              const club = rec.event.club_id ? getClubById(rec.event.club_id) : undefined;
+              const club = rec.event.club_id ? clubsById[rec.event.club_id] : undefined;
               const isPast = new Date(rec.event.start_time) < now;
-              const rsvpStatus = user ? getRsvpStatus(rec.event.id, user.user_id) : null;
+              const rsvpStatus = rsvpByEvent[rec.event.id] ?? null;
               return (
                 <EventCard
                   key={rec.event.id}
@@ -295,9 +318,9 @@ export default function EventsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredEvents.map((event) => {
-              const club = event.club_id ? getClubById(event.club_id) : undefined;
+              const club = event.club_id ? clubsById[event.club_id] : undefined;
               const isPast = new Date(event.start_time) < now;
-              const rsvpStatus = user ? getRsvpStatus(event.id, user.user_id) : null;
+              const rsvpStatus = rsvpByEvent[event.id] ?? null;
               return (
                 <EventCard
                   key={event.id}

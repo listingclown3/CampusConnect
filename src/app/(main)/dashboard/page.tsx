@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth/context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,81 +8,114 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { ArrowRight, Sparkles, TrendingUp, Calendar, Users, MessageCircle, BookOpen, Target, Zap } from 'lucide-react';
 import {
-  getStudents,
-  getStudentClassIds,
+  getVisibleProfiles,
+  getUserClassIds,
+  getUserClassIdsForUsers,
   getUserPods,
-  getUserConversations,
-  getEvents,
+  getAllEvents,
   getPodMembers,
-  getPods,
-  getStudentClasses,
-} from '@/lib/mock-data';
+  getAllPods,
+} from '@/lib/data/client';
 import { calculateMatchScore } from '@/lib/matching/score';
 import { getHiddenUserIds } from '@/lib/data/safety-actions';
+import { useChat } from '@/lib/chat/context';
 import { MatchPreviewCard } from '@/components/dashboard/match-preview-card';
 import { PodPreviewCard } from '@/components/dashboard/pod-preview-card';
 import { EventPreviewCard } from '@/components/dashboard/event-preview-card';
 import { StatsBar } from '@/components/dashboard/stats-bar';
+import type { Event, Pod, Profile } from '@/types/database';
+
+interface ScoredStudent {
+  student: Profile;
+  score: number;
+  reasons: string[];
+}
+
+interface RecommendedPod {
+  pod: Pod;
+  memberCount: number;
+}
+
+interface DashboardStats {
+  totalMatches: number;
+  podsJoined: number;
+  classesEnrolled: number;
+}
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();
+  const { conversations } = useChat();
 
-  const topMatches = useMemo(() => {
-    if (!user) return [];
-    const hiddenIds = getHiddenUserIds(user.user_id);
-    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible && !hiddenIds.includes(s.user_id));
-    const currentUserClasses = getStudentClassIds(user.user_id);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [topMatches, setTopMatches] = useState<ScoredStudent[]>([]);
+  const [recommendedPod, setRecommendedPod] = useState<RecommendedPod | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({ totalMatches: 0, podsJoined: 0, classesEnrolled: 0 });
 
-    const scored = students.map((student) => {
-      const studentClasses = getStudentClassIds(student.user_id);
-      const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
-      return { student, score: result.score, reasons: result.reasons };
-    });
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 4);
+    (async () => {
+      setDataLoading(true);
+      const [hiddenIds, visibleProfiles, currentUserClasses, userPods, allPods, events] = await Promise.all([
+        getHiddenUserIds(user.user_id),
+        getVisibleProfiles(user.user_id),
+        getUserClassIds(user.user_id),
+        getUserPods(user.user_id),
+        getAllPods(),
+        getAllEvents(),
+      ]);
+      if (cancelled) return;
+
+      const students = visibleProfiles.filter((s) => !hiddenIds.includes(s.user_id));
+      const classIdsByUser = await getUserClassIdsForUsers(students.map((s) => s.user_id));
+      if (cancelled) return;
+
+      const scored: ScoredStudent[] = students.map((student) => {
+        const studentClasses = classIdsByUser[student.user_id] ?? [];
+        const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
+        return { student, score: result.score, reasons: result.reasons };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      setTopMatches(scored.slice(0, 4));
+
+      const userPodIds = new Set(userPods.map((p) => p.id));
+      const available = allPods
+        .filter((p) => !userPodIds.has(p.id) && p.is_active)
+        .sort((a, b) => b.score - a.score);
+      if (available.length > 0) {
+        const memberCount = (await getPodMembers(available[0].id)).length;
+        if (!cancelled) setRecommendedPod({ pod: available[0], memberCount });
+      } else if (allPods.length > 0) {
+        const memberCount = (await getPodMembers(allPods[0].id)).length;
+        if (!cancelled) setRecommendedPod({ pod: allPods[0], memberCount });
+      } else if (!cancelled) {
+        setRecommendedPod(null);
+      }
+
+      const now = new Date();
+      const sortedEvents = [...events]
+        .filter((e) => new Date(e.start_time) >= now)
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      setUpcomingEvents(sortedEvents.slice(0, 3));
+
+      const matchCount = scored.filter((s) => s.score > 0).length;
+      setStats({
+        totalMatches: matchCount,
+        podsJoined: userPods.length,
+        classesEnrolled: currentUserClasses.length,
+      });
+
+      setDataLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  const recommendedPod = useMemo(() => {
-    if (!user) return null;
-    const userPods = getUserPods(user.user_id);
-    const allPods = getPods();
-    const userPodIds = new Set(userPods.map((p) => p.id));
-    const available = allPods
-      .filter((p) => !userPodIds.has(p.id) && p.is_active)
-      .sort((a, b) => b.score - a.score);
-    if (available.length === 0 && allPods.length > 0) {
-      return { pod: allPods[0], memberCount: getPodMembers(allPods[0].id).length };
-    }
-    if (available.length === 0) return null;
-    return { pod: available[0], memberCount: getPodMembers(available[0].id).length };
-  }, [user]);
-
-  const upcomingEvents = useMemo(() => {
-    const events = getEvents();
-    const now = new Date();
-    const sorted = [...events]
-      .filter((e) => new Date(e.start_time) >= now)
-      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-    return sorted.slice(0, 3);
-  }, []);
-
-  const stats = useMemo(() => {
-    if (!user) return { totalMatches: 0, podsJoined: 0, unreadMessages: 0, classesEnrolled: 0 };
-    const hiddenIds = getHiddenUserIds(user.user_id);
-    const students = getStudents().filter((s) => s.user_id !== user.user_id && s.is_visible && !hiddenIds.includes(s.user_id));
-    const currentUserClasses = getStudentClassIds(user.user_id);
-    const matchCount = students.filter((student) => {
-      const studentClasses = getStudentClassIds(student.user_id);
-      const result = calculateMatchScore(user, student, currentUserClasses, studentClasses);
-      return result.score > 0;
-    }).length;
-    const podsJoined = getUserPods(user.user_id).length;
-    const conversations = getUserConversations(user.user_id);
-    const unreadMessages = Math.min(conversations.length, 3);
-    const classesEnrolled = getStudentClasses(user.user_id).length;
-    return { totalMatches: matchCount, podsJoined, unreadMessages, classesEnrolled };
-  }, [user]);
+  const unreadMessages = Math.min(conversations.length, 3);
 
   // Compute quick insights
   const insights = useMemo(() => {
@@ -124,7 +157,7 @@ export default function DashboardPage() {
     return items.slice(0, 3);
   }, [user, stats, topMatches, upcomingEvents]);
 
-  if (isLoading) {
+  if (isLoading || dataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-6">
         <Skeleton className="h-8 w-64" />
@@ -154,7 +187,7 @@ export default function DashboardPage() {
       <StatsBar
         totalMatches={stats.totalMatches}
         podsJoined={stats.podsJoined}
-        unreadMessages={stats.unreadMessages}
+        unreadMessages={unreadMessages}
       />
 
       {/* Insights */}

@@ -1,14 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/context';
-import {
-  getPodById,
-  getStudents,
-  getStudentClassIds,
-  getClassesByIds,
-} from '@/lib/mock-data';
+import { getPodById, getProfileByUserId, getUserClassIds, getClassesByIds } from '@/lib/data/client';
 import { findBestMeetingTime } from '@/lib/matching/availability';
 import { generatePodExplanation } from '@/lib/ai';
 import { scorePodForUser, getPodScoreBreakdown } from '@/lib/data/pod-scoring';
@@ -38,11 +33,28 @@ import {
   LogOut,
   Layers,
 } from 'lucide-react';
-import type { Profile, DayOfWeek, TimeSlot } from '@/types/database';
+import type { Profile, Pod, DayOfWeek, TimeSlot } from '@/types/database';
 
 interface TimeSlotInfo {
   day: DayOfWeek;
   slot: TimeSlot;
+}
+
+interface MemberInfo {
+  profile: Profile;
+  contribution: string | undefined;
+}
+
+interface PodData {
+  memberProfiles: Profile[];
+  memberInfos: MemberInfo[];
+  sharedClassNames: string[];
+  score: number;
+  breakdown: ReturnType<typeof getPodScoreBreakdown>;
+  meetingTimes: TimeSlotInfo[];
+  isMember: boolean;
+  isFull: boolean;
+  memberCount: number;
 }
 
 export default function PodDetailPage() {
@@ -55,78 +67,105 @@ export default function PodDetailPage() {
   const [isGenerating, setIsGenerating] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const pod = useMemo(() => getPodById(podId), [podId]);
+  const [pod, setPod] = useState<Pod | null>(null);
+  const [podData, setPodData] = useState<PodData | null>(null);
+  const [podDataLoading, setPodDataLoading] = useState(true);
 
-  const podData = useMemo(() => {
-    if (!pod || !user) return null;
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
 
-    const students = getStudents();
-    const podMembers = getPodMembersForPod(pod.id);
-    const memberProfiles: Profile[] = podMembers
-      .map((pm) => students.find((s) => s.user_id === pm.user_id))
-      .filter((p): p is Profile => p !== null && p !== undefined);
+    (async () => {
+      setPodDataLoading(true);
+      const currentPod = await getPodById(podId);
+      if (cancelled) return;
+      setPod(currentPod);
 
-    const userClassIds = getStudentClassIds(user.user_id);
-
-    // Shared class info
-    let sharedClassNames: string[] = [];
-    if (pod.class_id) {
-      const classes = getClassesByIds([pod.class_id]);
-      if (classes.length > 0) {
-        sharedClassNames = [classes[0].course_code];
+      if (!currentPod) {
+        setPodData(null);
+        setPodDataLoading(false);
+        return;
       }
-    }
 
-    // Score
-    const score = scorePodForUser(user, memberProfiles, pod);
-    const breakdown = getPodScoreBreakdown(user, memberProfiles, pod);
+      const [podMembers, userClassIds, isMember, memberCount] = await Promise.all([
+        getPodMembersForPod(currentPod.id),
+        getUserClassIds(user.user_id),
+        isUserInPod(currentPod.id, user.user_id),
+        getPodMemberCount(currentPod.id),
+      ]);
+      if (cancelled) return;
 
-    // Meeting times - combine availability overlap across all members
-    let meetingTimes: TimeSlotInfo[] = [];
-    if (memberProfiles.length > 0) {
-      meetingTimes = findBestMeetingTime(user.availability, memberProfiles[0].availability, 3);
-    }
+      const memberProfiles = (
+        await Promise.all(podMembers.map((pm) => getProfileByUserId(pm.user_id)))
+      ).filter((p): p is Profile => p !== null);
+      if (cancelled) return;
 
-    // Member contributions
-    const memberInfos = memberProfiles.map((profile) => {
-      const memberClassIds = getStudentClassIds(profile.user_id);
-      const sharedClasses = userClassIds.filter((c) => memberClassIds.includes(c));
-      const sharedClassesList = getClassesByIds(sharedClasses);
-
-      let contribution: string | undefined;
-      if (sharedClassesList.length > 0) {
-        contribution = `shares ${sharedClassesList[0].course_code}`;
-      } else {
-        // Check availability
-        const slots = findBestMeetingTime(user.availability, profile.availability, 1);
-        if (slots.length > 0) {
-          const slotLabel = slots[0].slot === 'evening' ? 'available evenings' :
-            slots[0].slot === 'afternoon' ? 'available afternoons' :
-            slots[0].slot === 'morning' ? 'available mornings' : 'available late night';
-          contribution = slotLabel;
+      // Shared class info
+      let sharedClassNames: string[] = [];
+      if (currentPod.class_id) {
+        const classes = await getClassesByIds([currentPod.class_id]);
+        if (classes.length > 0) {
+          sharedClassNames = [classes[0].course_code];
         }
       }
 
-      return { profile, contribution };
-    });
+      // Score
+      const score = scorePodForUser(user, memberProfiles, currentPod);
+      const breakdown = getPodScoreBreakdown(user, memberProfiles, currentPod);
 
-    const isMember = isUserInPod(pod.id, user.user_id);
-    const memberCount = getPodMemberCount(pod.id);
-    const isFull = memberCount >= pod.max_members;
+      // Meeting times - combine availability overlap across all members
+      let meetingTimes: TimeSlotInfo[] = [];
+      if (memberProfiles.length > 0) {
+        meetingTimes = findBestMeetingTime(user.availability, memberProfiles[0].availability, 3);
+      }
 
-    return {
-      memberProfiles,
-      memberInfos,
-      sharedClassNames,
-      score,
-      breakdown,
-      meetingTimes,
-      isMember,
-      isFull,
-      memberCount,
+      // Member contributions
+      const memberInfos: MemberInfo[] = await Promise.all(
+        memberProfiles.map(async (profile) => {
+          const memberClassIds = await getUserClassIds(profile.user_id);
+          const sharedClasses = userClassIds.filter((c) => memberClassIds.includes(c));
+          const sharedClassesList = await getClassesByIds(sharedClasses);
+
+          let contribution: string | undefined;
+          if (sharedClassesList.length > 0) {
+            contribution = `shares ${sharedClassesList[0].course_code}`;
+          } else {
+            // Check availability
+            const slots = findBestMeetingTime(user.availability, profile.availability, 1);
+            if (slots.length > 0) {
+              const slotLabel = slots[0].slot === 'evening' ? 'available evenings' :
+                slots[0].slot === 'afternoon' ? 'available afternoons' :
+                slots[0].slot === 'morning' ? 'available mornings' : 'available late night';
+              contribution = slotLabel;
+            }
+          }
+
+          return { profile, contribution };
+        })
+      );
+
+      const isFull = memberCount >= currentPod.max_members;
+
+      if (!cancelled) {
+        setPodData({
+          memberProfiles,
+          memberInfos,
+          sharedClassNames,
+          score,
+          breakdown,
+          meetingTimes,
+          isMember,
+          isFull,
+          memberCount,
+        });
+        setPodDataLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pod, user, refreshKey]);
+  }, [podId, user, refreshKey]);
 
   // Generate explanation
   useEffect(() => {
@@ -154,23 +193,23 @@ export default function PodDetailPage() {
     generate();
   }, [pod, podData, user]);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!user || !pod) return;
-    joinPod(pod.id, user.user_id);
+    await joinPod(pod.id, user.user_id);
     setRefreshKey((k) => k + 1);
   };
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
     if (!user || !pod) return;
     if (window.confirm('Are you sure you want to leave this pod? You will also be removed from the group chat.')) {
-      leavePod(pod.id, user.user_id);
+      await leavePod(pod.id, user.user_id);
       setRefreshKey((k) => k + 1);
     }
   };
 
-  const handleOpenChat = () => {
+  const handleOpenChat = async () => {
     if (!pod) return;
-    const conv = findPodConversation(pod.id);
+    const conv = await findPodConversation(pod.id);
     if (conv) {
       router.push(`/chat/${conv.id}`);
     } else {
@@ -179,7 +218,7 @@ export default function PodDetailPage() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || podDataLoading) {
     return (
       <div className="p-4 lg:p-6 max-w-2xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />

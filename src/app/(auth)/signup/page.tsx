@@ -13,16 +13,29 @@ import { PIXEL_BUTTON, PIXEL_FONT } from '@/lib/pixel-style';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { loginWithPassword, sendMagicLink, isSupabaseAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [linkSent, setLinkSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isSupabaseAuth) {
+      setIsLoading(true);
+      const result = await sendMagicLink(email);
+      if (result.success) {
+        setLinkSent(true);
+      } else {
+        setError(result.error || 'Signup failed');
+      }
+      setIsLoading(false);
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -35,9 +48,8 @@ export default function SignupPage() {
     }
 
     setIsLoading(true);
-
     // In mock mode, signup works the same as login
-    const result = login(email, password);
+    const result = loginWithPassword(email, password);
     if (result.success) {
       router.push('/onboarding');
     } else {
@@ -45,6 +57,32 @@ export default function SignupPage() {
     }
     setIsLoading(false);
   };
+
+  if (linkSent) {
+    return (
+      <Card className="shadow-lg border-border/50">
+        <CardHeader className="text-center space-y-2">
+          <Image
+            src="/images/sammy-mascot.png"
+            alt="Sammy the Spartan"
+            width={56}
+            height={56}
+            className="mx-auto rounded-full"
+          />
+          <CardTitle className={`text-2xl font-bold ${PIXEL_FONT}`}>Check your email</CardTitle>
+          <CardDescription>
+            We sent a sign-in link to <span className="font-medium text-foreground">{email}</span>.
+            Click it to finish creating your account.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter className="justify-center">
+          <Button variant="outline" onClick={() => setLinkSent(false)}>
+            Use a different email
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-lg border-border/50">
@@ -75,37 +113,44 @@ export default function SignupPage() {
             />
             <p className="text-xs text-muted-foreground">Must be an @sjsu.edu email address</p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Create a password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm Password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              placeholder="Confirm your password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
+
+          {!isSupabaseAuth && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Create a password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+            </>
+          )}
 
           {error && (
             <p className="text-sm text-destructive font-medium">{error}</p>
           )}
 
           <Button type="submit" className={`w-full h-11 ${PIXEL_BUTTON}`} disabled={isLoading}>
-            {isLoading ? 'Creating account...' : 'Create Account'}
+            {isLoading
+              ? isSupabaseAuth ? 'Sending link...' : 'Creating account...'
+              : isSupabaseAuth ? 'Send Sign-In Link' : 'Create Account'}
           </Button>
         </form>
       </CardContent>

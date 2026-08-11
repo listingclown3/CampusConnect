@@ -35,7 +35,7 @@ export function CreateEventDialog({ onCreated }: CreateEventDialogProps) {
   const [isVirtual, setIsVirtual] = useState(false);
   const [virtualLink, setVirtualLink] = useState('');
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!user) return;
     if (!title.trim()) {
       toast.error('Please enter an event title');
@@ -55,7 +55,7 @@ export function CreateEventDialog({ onCreated }: CreateEventDialogProps) {
       ? new Date(`${endDate}T${endTime}:00`).toISOString()
       : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
 
-    createEvent({
+    await createEvent({
       title: title.trim(),
       description: description.trim() || `Join us for ${title.trim()}!`,
       club_id: null,

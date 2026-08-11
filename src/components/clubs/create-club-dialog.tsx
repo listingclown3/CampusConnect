@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { createClub } from '@/lib/data/crud-storage';
+import { joinClub } from '@/lib/data/event-actions';
+import { useAuth } from '@/lib/auth/context';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 
@@ -18,6 +20,7 @@ interface CreateClubDialogProps {
 }
 
 export function CreateClubDialog({ onCreated }: CreateClubDialogProps) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -28,7 +31,8 @@ export function CreateClubDialog({ onCreated }: CreateClubDialogProps) {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [tags, setTags] = useState('');
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (!user) return;
     if (!name.trim()) {
       toast.error('Please enter a club name');
       return;
@@ -38,7 +42,7 @@ export function CreateClubDialog({ onCreated }: CreateClubDialogProps) {
       return;
     }
 
-    createClub({
+    const newClub = await createClub({
       name: name.trim(),
       description: description.trim(),
       category,
@@ -50,7 +54,9 @@ export function CreateClubDialog({ onCreated }: CreateClubDialogProps) {
       member_count: 1,
       image_url: null,
       is_active: true,
+      created_by: user.user_id,
     });
+    await joinClub(newClub.id, user.user_id);
 
     toast.success(`Club "${name}" created successfully!`);
     setOpen(false);

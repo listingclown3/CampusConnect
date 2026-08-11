@@ -1,15 +1,19 @@
 'use client';
 
 import { MessageCircle } from 'lucide-react';
-import { useAuth } from '@/lib/auth/context';
 import { useChat } from '@/lib/chat/context';
 import { ConversationListItem } from '@/components/chat/conversation-list-item';
-import { getOtherUserInDirect, getUserDisplayName } from '@/lib/chat/realtime';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ChatPage() {
-  const { user } = useAuth();
-  const { conversations, isLoading, getUnreadForConversation, getLastMessageForConversation } = useChat();
+  const {
+    conversations,
+    isLoading,
+    getUnreadForConversation,
+    getLastMessageForConversation,
+    getOtherUserId,
+    getDisplayName,
+  } = useChat();
 
   if (isLoading) {
     return (
@@ -56,10 +60,10 @@ export default function ChatPage() {
 
             // Determine display name
             let displayName = conv.name || 'Conversation';
-            if (conv.type === 'direct' && user) {
-              const otherUserId = getOtherUserInDirect(conv.id, user.user_id);
+            if (conv.type === 'direct') {
+              const otherUserId = getOtherUserId(conv.id);
               if (otherUserId) {
-                displayName = getUserDisplayName(otherUserId);
+                displayName = getDisplayName(otherUserId) || displayName;
               }
             }
 

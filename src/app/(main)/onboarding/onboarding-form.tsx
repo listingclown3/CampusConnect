@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,9 +15,11 @@ import { StepIndicator } from '@/components/onboarding/step-indicator';
 import { AvailabilityGrid, DEFAULT_AVAILABILITY } from '@/components/onboarding/availability-grid';
 import { InterestTags } from '@/components/onboarding/interest-tags';
 import { ClassSearch } from '@/components/onboarding/class-search';
+import { AvatarCropper } from '@/components/onboarding/avatar-cropper';
 import { CampusWatermark } from '@/components/marketing/campus-watermark';
 import { useAuth } from '@/lib/auth/context';
 import { STORAGE_KEYS } from '@/lib/data/storage';
+import { saveUserClasses } from '@/lib/data/client';
 import { sanitizeText, sanitizeTextList } from '@/lib/validation/text';
 import { PIXEL_BUTTON, PIXEL_FONT } from '@/lib/pixel-style';
 import { Calendar } from 'lucide-react';
@@ -47,26 +50,90 @@ const STEP_TIPS = [
   'Almost done — you control what your circle can see.',
 ];
 
+// Full SJSU undergraduate major catalog (degree-type/concentration suffixes
+// stripped and deduped) plus 'Undeclared' for incoming students who haven't
+// picked one yet.
 const MAJOR_OPTIONS = [
-  'Computer Science',
-  'Software Engineering',
-  'Computer Engineering',
-  'Data Science',
+  'Advertising',
+  'Aerospace Engineering',
+  'African American Studies',
+  'Animation & Illustration',
+  'Anthropology',
+  'Applied Mathematics',
+  'Art',
+  'Art History and Visual Culture',
+  'Aviation',
+  'Behavioral Science',
+  'Biological Sciences',
+  'Biological Sciences - Ecology and Evolution',
+  'Biological Sciences - Marine Biology',
+  'Biomedical Engineering',
   'Business Administration',
-  'Biology',
-  'Psychology',
-  'Communication Studies',
-  'Mechanical Engineering',
-  'Electrical Engineering',
-  'Civil Engineering',
-  'Art & Design',
-  'English',
-  'Mathematics',
-  'Physics',
+  'Chemical Engineering',
   'Chemistry',
-  'Nursing',
+  'Chicana and Chicano Studies',
+  'Child and Adolescent Development',
+  'Chinese',
+  'Civil Engineering',
+  'Climate Science',
+  'Communication Studies',
+  'Communicative Disorders and Sciences',
+  'Computer Engineering',
+  'Computer Science',
+  'Creative Arts',
+  'Dance',
+  'Data Science',
+  'Design Studies',
+  'Earth System Science',
+  'Economics',
+  'Electrical Engineering',
+  'Engineering Technology',
+  'English',
+  'Environmental Studies',
+  'Forensic Science',
+  'French',
+  'Geography',
+  'Geology',
+  'Global Studies',
+  'Graphic Design',
+  'History',
+  'Humanities',
+  'Industrial Design',
+  'Industrial and Systems Engineering',
+  'Information Science and Data Analytics',
+  'Interdisciplinary Engineering',
+  'Interdisciplinary Studies',
+  'Interior Design',
+  'Japanese',
+  'Journalism',
+  'Justice Studies',
   'Kinesiology',
+  'Liberal Studies',
+  'Linguistics',
+  'Materials Engineering',
+  'Mathematics',
+  'Mechanical Engineering',
+  'Meteorology',
   'Music',
+  'Nursing',
+  'Nutritional Science',
+  'Organizational Studies',
+  'Packaging',
+  'Philosophy',
+  'Physics',
+  'Political Science',
+  'Psychology',
+  'Public Health',
+  'Public Relations',
+  'Radio-Television-Film',
+  'Recreation',
+  'Social Science',
+  'Social Work',
+  'Sociology',
+  'Software Engineering',
+  'Spanish',
+  'Statistics',
+  'Theatre Arts',
   'Undeclared',
 ];
 
@@ -125,6 +192,7 @@ interface FormData {
   last_name: string;
   student_type: StudentType;
   graduation_year: number;
+  avatar_url: string | null;
   major: string;
   intended_major: string;
   classes: string[];
@@ -146,7 +214,7 @@ interface OnboardingFormProps {
 
 export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
   const router = useRouter();
-  const { user, updateProfile } = useAuth();
+  const { user, userId, updateProfile } = useAuth();
 
   // Restore saved progress from localStorage
   const getSavedProgress = (): { step: number; formData: FormData } | null => {
@@ -172,6 +240,7 @@ export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
       last_name: user?.last_name || '',
       student_type: user?.student_type || 'freshman',
       graduation_year: user?.graduation_year || 2028,
+      avatar_url: user?.avatar_url || null,
       major: user?.major || '',
       intended_major: user?.intended_major || '',
       classes: [],
@@ -208,6 +277,20 @@ export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+
+  const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+    setImageToCrop(URL.createObjectURL(file));
+    // Allow re-selecting the same file later.
+    event.target.value = '';
+  };
+
   // Step 1 (name) and step 2 (major) are required before continuing;
   // everything else is optional.
   const canContinue =
@@ -227,7 +310,7 @@ export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
   };
 
   const handleComplete = () => {
-    if (!user) return;
+    if (!userId) return;
 
     if (!canComplete) {
       toast.error('Select a major before finishing setup.');
@@ -235,21 +318,53 @@ export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
       return;
     }
 
-    const firstName = sanitizeText(formData.first_name, NAME_MAX_LENGTH) || user.first_name;
-    const lastName = sanitizeText(formData.last_name, NAME_MAX_LENGTH) || user.last_name;
+    const firstName = sanitizeText(formData.first_name, NAME_MAX_LENGTH) || user?.first_name || '';
+    const lastName = sanitizeText(formData.last_name, NAME_MAX_LENGTH) || user?.last_name || '';
     const careerGoals = sanitizeTextList(formData.career_goals.split(','), {
       maxItems: MAX_CAREER_GOALS,
       maxLengthPerItem: CAREER_GOAL_MAX_LENGTH,
     });
 
+    // No existing profile row on first-time real-auth signup (mock mode
+    // always has one from mockLogin) — build a fresh shell so the upsert
+    // has every required column, then let Postgres assign the id.
+    const base: Profile =
+      user ?? {
+        id: '',
+        user_id: userId,
+        first_name: '',
+        last_name: '',
+        display_name: '',
+        avatar_url: null,
+        bio: null,
+        student_type: 'freshman',
+        major: '',
+        intended_major: null,
+        graduation_year: formData.graduation_year,
+        interests: [],
+        skills: [],
+        career_goals: [],
+        study_style: 'flexible',
+        collaboration_style: 'adaptive',
+        connection_types: [],
+        availability: DEFAULT_AVAILABILITY,
+        linkedin_url: null,
+        instagram_handle: null,
+        is_visible: true,
+        onboarding_complete: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
     const updatedProfile: Profile = {
-      ...user,
+      ...base,
       first_name: firstName,
       last_name: lastName,
       display_name: `${firstName} ${lastName.charAt(0)}.`,
       student_type: formData.student_type,
       graduation_year: formData.graduation_year,
-      major: formData.major || user.major,
+      avatar_url: formData.avatar_url,
+      major: formData.major || base.major,
       intended_major: formData.intended_major || null,
       interests: formData.interests,
       career_goals: careerGoals,
@@ -264,6 +379,7 @@ export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
     };
 
     updateProfile(updatedProfile);
+    saveUserClasses(userId, formData.classes);
     clearSavedProgress();
     toast.success('Profile complete! Welcome to SpartanCircle.');
     router.push('/dashboard');
@@ -376,14 +492,37 @@ export function OnboardingForm({ initialClasses }: OnboardingFormProps) {
                 <div className="space-y-2">
                   <Label>Profile Photo</Label>
                   <div className="flex items-center gap-3">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xl font-semibold">
-                      {formData.first_name ? formData.first_name.charAt(0).toUpperCase() : '?'}
+                    <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center text-muted-foreground text-xl font-semibold">
+                      {formData.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={formData.avatar_url} alt="Profile preview" className="w-full h-full object-cover" />
+                      ) : (
+                        formData.first_name ? formData.first_name.charAt(0).toUpperCase() : '?'
+                      )}
                     </div>
-                    <Button variant="outline" size="sm" type="button">
+                    <label className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'cursor-pointer')}>
                       Upload Photo
-                    </Button>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        className="hidden"
+                        onChange={handlePhotoSelect}
+                      />
+                    </label>
                   </div>
                 </div>
+
+                {imageToCrop && (
+                  <AvatarCropper
+                    imageSrc={imageToCrop}
+                    open={!!imageToCrop}
+                    onCancel={() => setImageToCrop(null)}
+                    onSave={(dataUrl) => {
+                      updateField('avatar_url', dataUrl);
+                      setImageToCrop(null);
+                    }}
+                  />
+                )}
               </>
             )}
 

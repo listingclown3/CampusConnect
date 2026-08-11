@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { getClubs, getEvents } from '@/lib/mock-data';
+import { useEffect, useMemo, useState } from 'react';
+import { getAllClubs, getAllEvents } from '@/lib/data/client';
 import { getUserCreatedClubs } from '@/lib/data/crud-storage';
 import { ClubCard } from '@/components/clubs/club-card';
 import { CreateClubDialog } from '@/components/clubs/create-club-dialog';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Building2, Search, X, Users, Calendar, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { Club, Event } from '@/types/database';
 
 type SortType = 'popular' | 'name' | 'events';
 
@@ -16,9 +18,24 @@ export default function ClubsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortType>('popular');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
 
-  const clubs = useMemo(() => [...getClubs(), ...getUserCreatedClubs()], [refreshKey]);
-  const events = useMemo(() => getEvents(), []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setDataLoading(true);
+      const [allClubs, allEvents, userClubs] = await Promise.all([getAllClubs(), getAllEvents(), getUserCreatedClubs()]);
+      if (cancelled) return;
+      setClubs([...allClubs, ...userClubs]);
+      setEvents(allEvents);
+      setDataLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
 
   const categories = useMemo(() => {
     const cats = new Set(clubs.map((c) => c.category));
@@ -70,6 +87,20 @@ export default function ClubsPage() {
   // Stats
   const totalMembers = clubs.reduce((sum, c) => sum + c.member_count, 0);
   const totalEvents = events.length;
+
+  if (dataLoading) {
+    return (
+      <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-10 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-64" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-5 pb-24">

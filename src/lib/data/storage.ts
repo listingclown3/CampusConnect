@@ -26,7 +26,32 @@ export const STORAGE_KEYS = {
   SAVED_MATCHES: 'spartancircle_saved_matches',
   SKIPPED_MATCHES: 'spartancircle_skipped_matches',
   ONBOARDING_PROGRESS: 'spartancircle_onboarding_progress',
+  USER_CLASSES: 'spartancircle_user_classes',
 } as const;
+
+// ============================================================
+// User Classes (mock-mode override on top of the static seed data in
+// mock-data/students.ts — lets a real onboarding flow's class selection
+// persist even without Supabase configured)
+// ============================================================
+
+export function getStoredUserClasses(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.USER_CLASSES);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function setStoredUserClasses(userId: string, classIds: string[]): void {
+  if (typeof window === 'undefined') return;
+  const all = getStoredUserClasses();
+  all[userId] = classIds;
+  localStorage.setItem(STORAGE_KEYS.USER_CLASSES, JSON.stringify(all));
+  notifyStorageChange();
+}
 
 // ============================================================
 // Conversations

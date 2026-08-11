@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useSyncExternalStore, use } from 'react';
+import { useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
@@ -9,13 +9,6 @@ import { ChatHeader } from '@/components/chat/chat-header';
 import { MessageBubble } from '@/components/chat/message-bubble';
 import { MessageInput } from '@/components/chat/message-input';
 import { DateSeparator } from '@/components/chat/date-separator';
-import {
-  getOtherUserInDirect,
-  getUserDisplayName,
-  addBlock,
-  isBlocked,
-} from '@/lib/chat/realtime';
-import { subscribeToStorage } from '@/lib/storage-sync';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
@@ -36,6 +29,10 @@ export default function ChatRoomPage({ params }: PageProps) {
     sendMessage,
     leaveConversation,
     canAccessConversation,
+    getOtherUserId,
+    getDisplayName,
+    isUserBlocked,
+    blockUser,
   } = useChat();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,16 +45,10 @@ export default function ChatRoomPage({ params }: PageProps) {
     };
   }, [conversationId, setActiveConversation]);
 
-  // Check if blocked (for direct chats), kept in sync with the block list
+  // Check if blocked (for direct chats)
   const directOtherUserId =
-    activeConversation?.type === 'direct' && user
-      ? getOtherUserInDirect(conversationId, user.user_id)
-      : null;
-  const getBlockedSnapshot = useMemo(
-    () => () => (user && directOtherUserId ? isBlocked(user.user_id, directOtherUserId) : false),
-    [user, directOtherUserId]
-  );
-  const blocked = useSyncExternalStore(subscribeToStorage, getBlockedSnapshot, getBlockedSnapshot);
+    activeConversation?.type === 'direct' ? getOtherUserId(conversationId) : null;
+  const blocked = !!directOtherUserId && isUserBlocked(directOtherUserId);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -95,9 +86,9 @@ export default function ChatRoomPage({ params }: PageProps) {
   // Determine conversation title
   let conversationTitle = activeConversation.name || 'Conversation';
   if (activeConversation.type === 'direct') {
-    const otherUserId = getOtherUserInDirect(conversationId, userId);
+    const otherUserId = getOtherUserId(conversationId);
     if (otherUserId) {
-      conversationTitle = getUserDisplayName(otherUserId);
+      conversationTitle = getDisplayName(otherUserId) || conversationTitle;
     }
   }
 
@@ -127,8 +118,8 @@ export default function ChatRoomPage({ params }: PageProps) {
   };
 
   const handleBlock = () => {
-    if (activeConversation.type === 'direct' && user && directOtherUserId) {
-      addBlock(user.user_id, directOtherUserId);
+    if (activeConversation.type === 'direct' && directOtherUserId) {
+      blockUser(directOtherUserId);
     }
   };
 
@@ -166,7 +157,7 @@ export default function ChatRoomPage({ params }: PageProps) {
                   content={msg.content}
                   timestamp={msg.created_at}
                   isOwn={isOwn}
-                  senderName={!isOwn ? getUserDisplayName(msg.sender_id) : undefined}
+                  senderName={!isOwn ? getDisplayName(msg.sender_id) : undefined}
                   showSenderInfo={isGroup}
                 />
               );
