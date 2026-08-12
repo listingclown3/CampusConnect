@@ -1,0 +1,28 @@
+{
+  "project_type": "Next.js App Router full-stack web application with Supabase backend",
+  "language": "TypeScript",
+  "build_system": "Next.js with pnpm, shadcn/ui CLI for components",
+  "test_framework": "Vitest for unit tests on utility functions",
+  "build_command": "pnpm build",
+  "test_command": "pnpm test",
+  "verification_instructions": "1. Run pnpm build to verify no TypeScript/build errors. 2. Run pnpm test to verify utility function tests pass. 3. Run pnpm dev and verify demo flow works.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "1. cd /projects/sandbox/CampusConnect. 2. pnpm install. 3. Copy .env.example to .env.local. 4. pnpm dev to start development server.",
+  "environment_constraints": "OPEN_INTERNET - full access to npm registry, APIs, etc. Node.js v22 available. No live Supabase instance - use mock data layer for demo. No OpenAI API key - use template-based fallback text.",
+  "contribution_requirements": "Production-quality TypeScript, Tailwind CSS, shadcn/ui components, mobile-first responsive design, SJSU blue (#0055A2) and gold theme.",
+  "key_patterns": "Next.js App Router with app/ directory, server components by default, client components where needed for interactivity, Supabase client setup reading from env vars, mock data layer for demo without live DB, deterministic matching algorithms as pure utility functions",
+  "relevant_files": [
+    "src/app/layout.tsx",
+    "src/app/page.tsx",
+    "src/lib/supabase/client.ts",
+    "src/lib/supabase/server.ts",
+    "src/lib/mock-data/",
+    "src/lib/matching/",
+    "src/lib/ai/",
+    "src/components/ui/",
+    "supabase/migrations/",
+    "src/app/(auth)/",
+    "src/app/(main)/"
+  ],
+  "directory_structure": "src/app/ - Next.js App Router pages and layouts | src/components/ - shared React components | src/components/ui/ - shadcn/ui primitives | src/lib/ - utilities, matching logic, data layer | src/lib/supabase/ - Supabase client setup | src/lib/mock-data/ - seed data and mock providers | src/lib/matching/ - scoring algorithms | src/lib/ai/ - AI helper functions with fallbacks | src/types/ - TypeScript type definitions | supabase/migrations/ - SQL schema files | public/ - static assets, PWA manifest, icons"
+}

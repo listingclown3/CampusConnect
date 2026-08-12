@@ -1,0 +1,88 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { MessageCircle } from 'lucide-react';
+import { useAuth } from '@/lib/auth/context';
+import { useChat } from '@/lib/chat/context';
+import { ConversationListItem } from '@/components/chat/conversation-list-item';
+import { getOtherUserInDirect, getUserDisplayName } from '@/lib/chat/realtime';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export default function ChatPage() {
+  const { user } = useAuth();
+  const { conversations, isLoading, getUnreadForConversation, getLastMessageForConversation } = useChat();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || isLoading) {
+    return (
+      <div className="p-4 lg:p-6 max-w-2xl mx-auto">
+        <h1 className="text-xl font-bold mb-4">Messages</h1>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 py-3">
+        <h1 className="text-xl font-bold">Messages</h1>
+      </div>
+
+      {/* Conversation list */}
+      {conversations.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <MessageCircle className="h-8 w-8 text-primary" />
+          </div>
+          <h2 className="text-lg font-semibold mb-2">No conversations yet</h2>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Start chatting by connecting with your matches or joining a study pod!
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y">
+          {conversations.map((conv) => {
+            const lastMessage = getLastMessageForConversation(conv.id);
+            const unread = getUnreadForConversation(conv.id);
+
+            // Determine display name
+            let displayName = conv.name || 'Conversation';
+            if (conv.type === 'direct' && user) {
+              const otherUserId = getOtherUserInDirect(conv.id, user.user_id);
+              if (otherUserId) {
+                displayName = getUserDisplayName(otherUserId);
+              }
+            }
+
+            return (
+              <ConversationListItem
+                key={conv.id}
+                id={conv.id}
+                type={conv.type}
+                name={displayName}
+                lastMessage={lastMessage?.content || null}
+                lastMessageTime={lastMessage?.created_at || conv.last_message_at || null}
+                unreadCount={unread}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
