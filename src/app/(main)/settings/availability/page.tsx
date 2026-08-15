@@ -12,14 +12,18 @@ export default function AvailabilitySettingsPage() {
   const { user, updateProfile } = useAuth();
   const [availability, setAvailability] = useState(user?.availability || DEFAULT_AVAILABILITY);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
 
-    updateProfile({
+    const result = await updateProfile({
       ...user,
       availability,
       updated_at: new Date().toISOString(),
     });
+    if (!result.success) {
+      toast.error(result.error || 'Could not save your availability. Please try again.');
+      return;
+    }
     toast.success('Availability updated!');
   };
 

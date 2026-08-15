@@ -95,7 +95,7 @@ const howItWorks = [
 
 export default function LandingPage() {
   const router = useRouter();
-  const { demoLogin, isAuthenticated } = useAuth();
+  const { demoLogin, isAuthenticated, isSupabaseAuth } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -184,15 +184,17 @@ export default function LandingPage() {
               Get Started Free
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleDemoLogin}
-              className="w-full sm:w-auto bg-white/5 border-white/30 text-white hover:bg-white/15 hover:text-white px-10 h-14 text-base rounded-xl backdrop-blur-sm transition-all hover:scale-105"
-            >
-              Try Demo
-              <Sparkles className="w-4 h-4 ml-2" />
-            </Button>
+            {!isSupabaseAuth && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleDemoLogin}
+                className="w-full sm:w-auto bg-white/5 border-white/30 text-white hover:bg-white/15 hover:text-white px-10 h-14 text-base rounded-xl backdrop-blur-sm transition-all hover:scale-105"
+              >
+                Try Demo
+                <Sparkles className="w-4 h-4 ml-2" />
+              </Button>
+            )}
           </div>
 
           {/* Trust signals */}
@@ -365,14 +367,16 @@ export default function LandingPage() {
               Join SpartanCircle
               <ChevronRight className="w-5 h-5 ml-1" />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleDemoLogin}
-              className="w-full sm:w-auto bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white px-10 h-14 text-base rounded-xl transition-all hover:scale-105"
-            >
-              Explore Demo
-            </Button>
+            {!isSupabaseAuth && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleDemoLogin}
+                className="w-full sm:w-auto bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white px-10 h-14 text-base rounded-xl transition-all hover:scale-105"
+              >
+                Explore Demo
+              </Button>
+            )}
           </div>
         </div>
       </section>

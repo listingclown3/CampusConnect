@@ -62,7 +62,7 @@ export default function ProfileSettingsPage() {
   const [skills, setSkills] = useState<string[]>(user?.skills || []);
   const [careerGoals, setCareerGoals] = useState(user?.career_goals?.join(', ') || '');
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
 
     const updated: Profile = {
@@ -82,7 +82,11 @@ export default function ProfileSettingsPage() {
       updated_at: new Date().toISOString(),
     };
 
-    updateProfile(updated);
+    const result = await updateProfile(updated);
+    if (!result.success) {
+      toast.error(result.error || 'Could not save your profile. Please try again.');
+      return;
+    }
     toast.success('Profile updated successfully!');
   };
 

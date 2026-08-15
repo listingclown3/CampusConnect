@@ -29,14 +29,18 @@ export default function PrivacySettingsPage() {
     };
   }, [user]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
 
-    updateProfile({
+    const result = await updateProfile({
       ...user,
       is_visible: isVisible && !hideFromMatching,
       updated_at: new Date().toISOString(),
     });
+    if (!result.success) {
+      toast.error(result.error || 'Could not save your privacy settings. Please try again.');
+      return;
+    }
     toast.success('Privacy settings updated!');
   };
 

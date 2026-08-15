@@ -36,7 +36,7 @@ interface AuthContextType {
   sendMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   demoLogin: () => void;
   logout: () => void;
-  updateProfile: (profile: Profile) => void | Promise<void>;
+  updateProfile: (profile: Profile) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,8 +69,9 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
     mockLogout();
   }, []);
 
-  const updateProfile = useCallback((profile: Profile) => {
+  const updateProfile = useCallback(async (profile: Profile) => {
     updateStoredUser(profile);
+    return { success: true };
   }, []);
 
   return (
@@ -177,19 +178,37 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(
-    async (profile: Profile) => {
+    async (profile: Profile): Promise<{ success: boolean; error?: string }> => {
       const supabase = createClient();
-      if (!supabase || !userId) return;
+      if (!supabase || !userId) return { success: false, error: 'Not signed in.' };
+
+      // `profiles.user_id` has a FK to `users(id)`. That row is normally
+      // created by a DB trigger the moment someone signs up (see migration
+      // 003), but if it ever misses — schema drift, a migration that hadn't
+      // been pushed yet, etc. — the profile upsert below fails with a FK
+      // violation and there was previously no way to recover: RLS only let
+      // a client SELECT/UPDATE its own `users` row, not INSERT one. Self-heal
+      // by upserting it here (migration 009 grants the INSERT policy this
+      // needs) before writing the profile.
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser?.email) {
+        await supabase
+          .from('users')
+          .upsert({ id: userId, email: authUser.email }, { onConflict: 'id', ignoreDuplicates: true });
+      }
+
       // Omit a blank id on first insert so Postgres assigns one; keep it on
       // updates so the upsert targets the existing row.
       const { id, ...rest } = profile;
       const payload = id ? { id, ...rest, user_id: userId } : { ...rest, user_id: userId };
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .upsert(payload, { onConflict: 'user_id' })
         .select('*')
         .single();
-      if (data) setUser(data as Profile);
+      if (error) return { success: false, error: error.message };
+      setUser(data as Profile);
+      return { success: true };
     },
     [userId]
   );

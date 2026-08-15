@@ -143,7 +143,11 @@ export function SpartanOnboarding({ initialClasses }: SpartanOnboardingProps) {
         updated_at: new Date().toISOString(),
       };
 
-      await updateProfile(updatedProfile);
+      const result = await updateProfile(updatedProfile);
+      if (!result.success) {
+        toast.error(result.error || 'Could not save your profile. Please try again.');
+        return;
+      }
       await saveUserClasses(userId, state.selectedClasses.map((c) => c.id));
 
       toast.success('Profile complete! Welcome to SpartanCircle.');
